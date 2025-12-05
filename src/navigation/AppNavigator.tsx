@@ -1,60 +1,52 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { SH, SF, SW } from '../utils/Responsiveness/Dimensions';
+import { SH, SF} from '../utils/Responsiveness/Dimensions';
 import Colors from '../utils/Colors/Colors';
+import Fonts from '../utils/Fonts/Fonts';
 
 import HomeScreen from '../screens/Tabs/HomeScreen/HomeScreen';
 import ProfileScreen from '../screens/Tabs/ProfileScreen/ProfileScreen';
 import HistoryScreen from '../screens/Tabs/HistoryScreen/HistoryScreen';
-
 import LoadingScreen from '../screens/StackScreens/Loading/LoadingScreen';
 import Login from '../screens/StackScreens/AuthScreens/Login/Login';
+import ForgotPassword from '../screens/StackScreens/AuthScreens/ForgotPassword/ForgotPassword';
 import OtpVerification from '../screens/StackScreens/AuthScreens/OtpVerification/OtpVerification';
 import DropOrder from '../screens/StackScreens/DropOrder/DropOrder';
 import CashOnDelivery from '../screens/StackScreens/CashOnDelivery/CashOnDelivery';
 import DeliveryComplete from '../screens/StackScreens/DeliveryComplete/DeliveryComplete';
-import { OrderItem } from '../DummyData/OrdersData';
 import LiveOrderHelp from '../screens/StackScreens/LiveOrderHelp/LiveOrderHelp';
-
 import PendingDeliveries from '../screens/StackScreens/PendingDeliveries/PendingDeliveries';
 import AllDeliveryRecordData from '../screens/StackScreens/AllDeliveryRecordData/AllDeliveryRecordData';
-import Fonts from '../utils/Fonts/Fonts';
 import NotDelivered from '../screens/StackScreens/NotDelivered/NotDelivered';
-import ForgotPassword from '../screens/StackScreens/AuthScreens/ForgotPassword/ForgotPassword';
 import NotDeliveryRecordData from '../screens/StackScreens/NotDeliveryRecordData/NotDeliveryRecordData';
 import ContactSupport from '../screens/StackScreens/ContactSupport/ContactSupport';
 import TotalCodCollected from '../screens/StackScreens/TotalCodCollected/TotalCodCollected';
+import { navigationRef } from './NavigationService';
+import { OrderItem } from '../DummyData/OrdersData';
 
 export type RootStackParamList = {
     Loading: undefined;
     Login: undefined;
-    ForgotPassword:undefined
+    ForgotPassword: undefined;
     OtpVerification: undefined;
-   MainTabs: {
-  screen: keyof RootTabParamList;
-  params?: any;
-} | undefined;
+    MainTabs: {
+        screen: keyof RootTabParamList;
+        params?: any;
+    };
     DropOrder: { OrderData: OrderItem };
     CashOnDelivery: { OrderData: OrderItem };
     DeliveryComplete: undefined;
     LiveOrderHelp: { OrderData: OrderItem };
     PendingDeliveries: undefined;
     NotDelivered: undefined;
-    NotDeliveryRecordData:{ order: OrderItem };
-    ContactSupport:undefined;
-    TotalCodCollected:undefined;
-};
-
-export type HistoryStackParamList = {
-    HistoryMain: undefined;
-    CompletedDeliveries: undefined;
-    AllDeliveryRecordData: { order: OrderItem };
+    NotDeliveryRecordData: { order: OrderItem };
+    ContactSupport: undefined;
+    TotalCodCollected: undefined;
 };
 
 export type RootTabParamList = {
@@ -65,15 +57,14 @@ export type RootTabParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<RootTabParamList>();
-const HistoryStack = createNativeStackNavigator<HistoryStackParamList>();
 
+const HistoryStack = createNativeStackNavigator();
 const HistoryStackNavigator = () => (
     <HistoryStack.Navigator screenOptions={{ headerShown: false }}>
         <HistoryStack.Screen name="HistoryMain" component={HistoryScreen} />
         <HistoryStack.Screen name="AllDeliveryRecordData" component={AllDeliveryRecordData} />
     </HistoryStack.Navigator>
 );
-
 
 const MainTabs: React.FC = () => {
     const insets = useSafeAreaInsets();
@@ -97,29 +88,11 @@ const MainTabs: React.FC = () => {
                 },
                 tabBarIcon: ({ focused, color }) => {
                     let iconName = '';
-
                     if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
                     else if (route.name === 'History') iconName = focused ? 'history' : 'history';
                     else if (route.name === 'Profile') iconName = focused ? 'account' : 'account-outline';
 
-                    return (
-                        <View style={{ alignItems: 'center' }}>
-                            {focused && (
-                                <View
-                                    style={{
-                                        position: 'absolute',
-                                        top: -5,
-                                        width: SW(50),
-                                        height: SH(4),
-                                        borderBottomLeftRadius: 10,
-                                        borderBottomRightRadius: 10,
-                                        backgroundColor: Colors.primary,
-                                    }}
-                                />
-                            )}
-                            <Icon name={iconName} size={22} color={color} style={{ marginTop: SH(5) }} />
-                        </View>
-                    );
+                    return <Icon name={iconName} size={22} color={color} />;
                 },
             })}
         >
@@ -132,7 +105,7 @@ const MainTabs: React.FC = () => {
 
 const RootNavigator: React.FC = () => {
     return (
-        <NavigationContainer>
+        <NavigationContainer ref={navigationRef}>
             <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Loading">
                 <Stack.Screen name="Loading" component={LoadingScreen} />
                 <Stack.Screen name="Login" component={Login} />
@@ -153,6 +126,5 @@ const RootNavigator: React.FC = () => {
     );
 };
 
-export default RootNavigator;
 
-const styles = StyleSheet.create({});
+export default RootNavigator;

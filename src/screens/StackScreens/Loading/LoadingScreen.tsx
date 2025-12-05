@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Animated, Image, StyleSheet } from 'react-native';
 import { SH, SW } from '../../../utils/Responsiveness/Dimensions';
 import Colors from '../../../utils/Colors/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LoadingScreen = ({ navigation }: any) => {
   const logoScaleAnimation = useRef(new Animated.Value(0)).current;
@@ -13,8 +14,13 @@ const LoadingScreen = ({ navigation }: any) => {
       useNativeDriver: true,
     }).start();
 
-    const timer = setTimeout(() => {
-      navigation.replace('Login');
+    const timer = setTimeout(async () => {
+      const token = await AsyncStorage.getItem('authToken');
+      if (token) {
+        navigation.replace('MainTabs'); 
+      } else {
+        navigation.replace('Login');   
+      }
     }, 2000);
 
     return () => clearTimeout(timer);

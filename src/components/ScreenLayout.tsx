@@ -6,14 +6,14 @@ import { SH, SW } from '../utils/Responsiveness/Dimensions';
 interface Props {
     children: React.ReactNode;
     bottomComponent?: React.ReactNode;
-    scrollable?: boolean;   // <-- ADD THIS
+    scrollable?: boolean;
 }
 
 const ScreenLayout: React.FC<Props> = ({ children, bottomComponent, scrollable }) => {
     const Container = scrollable ? ScrollView : View;
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }} edges={['bottom']}>
             <Container
                 {...(scrollable ? {
                     contentContainerStyle: { paddingBottom: bottomComponent ? SH(80) : SH(10) }

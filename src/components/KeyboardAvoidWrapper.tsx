@@ -22,7 +22,7 @@ const KeyboardAvoidWrapper: React.FC<Props> = ({
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root]}>
       <KeyboardAwareScrollView
         style={{ flex: 1 }}
         contentContainerStyle={[styles.scrollContent, contentStyle]}

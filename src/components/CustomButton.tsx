@@ -6,19 +6,22 @@ import { SH, SW, SF } from '../utils/Responsiveness/Dimensions';
 type CustomButtonProps<Screen extends string = string> = {
   title: string;
   onPress?: (event: GestureResponderEvent) => void;
-  Icon?: React.ReactNode; 
+  Icon?: React.ReactNode;
+  disabled?: boolean;
 };
 
 const CustomButton = <Screen extends string>({
   title,
   onPress,
   Icon,
+  disabled,
 }: CustomButtonProps<Screen>) => {
   return (
     <TouchableOpacity
-      style={styles.button}
+      style={[styles.button, disabled && { opacity: 0.6 }]}
       onPress={onPress}
       activeOpacity={0.8}
+      disabled={disabled}
     >
       <View style={styles.content}>
         {Icon && <View style={styles.iconContainer}>{Icon}</View>}
