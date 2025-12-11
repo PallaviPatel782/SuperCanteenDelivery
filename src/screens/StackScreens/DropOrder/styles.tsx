@@ -247,7 +247,7 @@ export default StyleSheet.create({
   totalText: {
     fontSize: SF(14),
     color: Colors.black,
-    fontFamily: 'Inter-Regular',
+    fontFamily: 'Inter-Medium',
     marginRight: SW(10),
   },
   paidTagBox: {

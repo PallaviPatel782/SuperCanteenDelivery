@@ -1,9 +1,11 @@
 import { configureStore } from "@reduxjs/toolkit";
 import profileReducer from "./slices/GetProfileSlice";
+import assignedOrdersReducer from './slices/assignedOrdersSlice';
 
 const store = configureStore({
   reducer: {
     profile: profileReducer,
+    assignedOrders: assignedOrdersReducer,
   },
 });
 

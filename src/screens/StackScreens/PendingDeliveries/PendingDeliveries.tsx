@@ -3,12 +3,13 @@ import { View, Text, FlatList, TouchableOpacity, ScrollView } from 'react-native
 import ScreenLayout from '../../../components/ScreenLayout';
 import { SH, SW } from '../../../utils/Responsiveness/Dimensions';
 import Colors from '../../../utils/Colors/Colors';
-import { Package, CheckCircle, UserCheck2Icon, Calendar, MapPin } from 'lucide-react-native';
+import { Package, CheckCircle, UserCheck2Icon, MapPin } from 'lucide-react-native';
 import styles from './styles';
-import { OrderItem, pendingOrders } from '../../../DummyData/OrdersData';
 import Header from '../../../components/Header';
 import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../../redux/store';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'MainTabs'>;
 
@@ -18,17 +19,25 @@ type Props = {
 
 const PendingDeliveries: React.FC<Props> = ({ navigation }) => {
 
-    const AllPendingOrders = pendingOrders;
+    const { data: orders = [] } = useSelector((state: RootState) => state.assignedOrders);
 
-    const renderOrderCard = ({ item }: { item: OrderItem }) => {
+    const pendingOrders = orders.filter(o =>
+        o.deliveryStatus === 'Assigned' &&
+        (o.status === 'Awaited' || o.status === 'Pending')
+    );
+
+    const renderOrderCard = ({ item }: any) => {
         const ribbonStyles = {
-            bg: item.status === "Pending" ? "#faf1d1ff" : "#dbfae6ff",
-            text: item.status === "Pending" ? "#FACC15" : "#16A34A",
-            icon: item.status === "Pending" ? "#FACC15" : "#16A34A",
+            bg: "#faf1d1ff",
+            text: "#FACC15",
+            icon: "#FACC15",
         };
 
         return (
-            <TouchableOpacity style={styles.cardWrapper} onPress={() => navigation.navigate('DropOrder', { OrderData: item })}>
+            <TouchableOpacity
+                style={styles.cardWrapper}
+                onPress={() => navigation.navigate('DropOrder', { OrderData: item })}
+            >
                 <View style={[styles.ribbon, { backgroundColor: ribbonStyles.bg }]}>
                     <CheckCircle size={12} color={ribbonStyles.icon} style={{ marginRight: 5 }} />
                     <Text style={[styles.ribbonText, { color: ribbonStyles.text }]}>
@@ -39,22 +48,22 @@ const PendingDeliveries: React.FC<Props> = ({ navigation }) => {
                     <View style={styles.rowBetween}>
                         <View style={styles.row}>
                             <Package size={14} color={Colors.primary} style={{ marginRight: SW(6) }} />
-                            <Text style={styles.orderId}>{item.id}</Text>
+                            <Text style={styles.orderId}>{item.orderId}</Text>
                         </View>
 
                         <View
                             style={[
                                 styles.paymentBadge,
-                                { backgroundColor: item.paymentType === 'COD' ? '#FFF2F0' : '#E6F7FF' }
+                                { backgroundColor: item.isCOD ? '#FFF2F0' : '#E6F7FF' }
                             ]}
                         >
                             <Text
                                 style={[
                                     styles.paymentText,
-                                    { color: item.paymentType === 'COD' ? '#D9480F' : '#096DD9' }
+                                    { color: item.isCOD ? '#D9480F' : '#096DD9' }
                                 ]}
                             >
-                                {item.paymentType}
+                                {item.isCOD ? 'COD' : 'Prepaid'}
                             </Text>
                         </View>
                     </View>
@@ -62,14 +71,14 @@ const PendingDeliveries: React.FC<Props> = ({ navigation }) => {
                     {/* Customer Name */}
                     <View style={[styles.row, { marginTop: SH(6) }]}>
                         <UserCheck2Icon size={12} color={Colors.primary} style={{ marginRight: SW(6) }} />
-                        <Text style={styles.customerName}>{item.name}</Text>
+                        <Text style={styles.customerName}>{item.shippingAddress.name}</Text>
                     </View>
 
-                    {/* Address Line */}
+                    {/* Address */}
                     <View style={[styles.row, { marginTop: SH(6) }]}>
                         <MapPin size={12} color={Colors.primary} style={{ marginRight: SW(6) }} />
                         <Text style={styles.address} numberOfLines={1}>
-                            {item.address}
+                            {item.shippingAddress.address}
                         </Text>
                     </View>
                 </View>
@@ -77,26 +86,21 @@ const PendingDeliveries: React.FC<Props> = ({ navigation }) => {
         );
     };
 
-
-
     return (
         <ScreenLayout>
             <Header
                 showBack={true}
                 title="Pending Deliveries"
-            // rightIcon="filter-outline"
             />
-            <ScrollView contentContainerStyle={{ padding: SW(10) }}>
 
-                <View>
-                    <FlatList
-                        data={AllPendingOrders}
-                        keyExtractor={item => item.id}
-                        renderItem={renderOrderCard}
-                        scrollEnabled={false}
-                        contentContainerStyle={{ marginTop: SH(10), paddingBottom: SH(20) }}
-                    />
-                </View>
+            <ScrollView contentContainerStyle={{ padding: SW(10) }}>
+                <FlatList
+                    data={pendingOrders}
+                    keyExtractor={(item) => item._id}
+                    renderItem={renderOrderCard}
+                    scrollEnabled={false}
+                    contentContainerStyle={{ marginTop: SH(10), paddingBottom: SH(20) }}
+                />
             </ScrollView>
         </ScreenLayout>
     );
