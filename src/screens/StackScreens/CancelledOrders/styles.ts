@@ -32,9 +32,9 @@ export default StyleSheet.create({
         paddingVertical: SH(8),
         borderRadius: 16,
         borderWidth: 1,
-        borderTopLeftRadius: 0,
         borderColor: '#EAEAEA',
         elevation: 4,
+        borderTopLeftRadius: 0,
         shadowColor: '#00000040',
     },
 
@@ -97,18 +97,14 @@ export default StyleSheet.create({
         color: '#555',
         width: '85%',
     },
-    loadMoreBtn: {
-        marginTop: SH(15),
-        alignSelf: 'center',
-
-        paddingHorizontal: SW(20),
-        paddingVertical: SH(8),
-        borderRadius: 8,
+    failedBox: {
+        marginTop: SH(8),
+        backgroundColor: '#f2e6e6ff',
+        padding: SH(6),
+        borderRadius: SH(4),
     },
-    loadMoreText: {
-        color: Colors.primary,
-        fontSize: 14,
-        fontWeight: '600',
+    failedText: {
+        color: 'rgba(253, 2, 2, 1)', fontSize: SF(10), marginTop: SH(2)
     }
 
 });

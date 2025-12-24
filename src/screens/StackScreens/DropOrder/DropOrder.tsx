@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Linking, Alert, Image, Modal, FlatList, TouchableWithoutFeedback, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, Alert, Image, Modal, FlatList, TouchableWithoutFeedback, ScrollView, Platform } from 'react-native';
 import Header from '../../../components/Header';
 import ScreenLayout from '../../../components/ScreenLayout';
 import Colors from '../../../utils/Colors/Colors';
@@ -11,12 +11,17 @@ import SwipeButton from 'rn-swipe-button';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../../navigation/AppNavigator';
 import { BASE_URL } from '../../../utils/apis/BASE_URL';
+import { useDispatch } from "react-redux";
+import { reachedDropOrder } from "../../../redux/slices/assignedOrdersSlice";
+import { showMessage } from "react-native-flash-message";
 
 type DropOrderRouteProp = RouteProp<RootStackParamList, 'DropOrder'>;
 
 const DropOrder: React.FC = () => {
+  const dispatch = useDispatch<any>();
   const route = useRoute<DropOrderRouteProp>();
   const { OrderData } = route.params as any;
+  console.log("OrderData", OrderData);
 
   const [showOrderModal, setShowOrderModal] = useState(false);
   const navigation = useNavigation<any>();
@@ -30,31 +35,107 @@ const DropOrder: React.FC = () => {
     }
   };
 
-  const handleOpenMap = () => {
-    const address = encodeURIComponent(OrderData.shippingAddress.address);
-    const url = `https://www.google.com/maps/search/?api=1&query=${address}`;
-    Linking.openURL(url).catch(() => {
-      Alert.alert('Error', 'Unable to open map.');
-    });
+  const handleReachedDrop = async () => {
+    const orderId = OrderData._id;
+
+    const result = await dispatch(reachedDropOrder(orderId));
+
+    if (reachedDropOrder.fulfilled.match(result)) {
+      showMessage({
+        message: result.payload.message,
+        type: "success",
+        icon: "success",
+      });
+
+      navigation.navigate("CashOnDelivery", { OrderData: OrderData });
+
+    } else {
+      showMessage({
+        message: result.payload || "Failed to reach drop",
+        type: "danger",
+        icon: "danger",
+      });
+    }
   };
+
+  const handleOpenMap = () => {
+    const { currentLocation, address } = OrderData.shippingAddress;
+
+    if (currentLocation?.lat && currentLocation?.lng) {
+      const lat = currentLocation.lat;
+      const lng = currentLocation.lng;
+
+      const url = Platform.select({
+        ios: `http://maps.apple.com/?ll=${lat},${lng}`,
+        android: `geo:${lat},${lng}?q=${lat},${lng}`,
+        default: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
+      });
+
+      Linking.openURL(url!).catch(() => {
+        Alert.alert("Error", "Unable to open map.");
+      });
+    }
+    if (address) {
+      const encodedAddress = encodeURIComponent(address);
+      const url = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+
+      Linking.openURL(url).catch(() => {
+        Alert.alert("Error", "Unable to open map.");
+      });
+    }
+    else {
+      Alert.alert("Location not available");
+    }
+  };
+
+
+  const getProductVariantText = (item: any) => {
+    switch (item.productType) {
+      case "Single":
+        return "";
+
+      case "WeightPack":
+        return ` (${item.weightPack?.size})`;
+
+      case "ColorSize":
+        return ` (${item.colorSize?.color?.name}, Size: ${item.colorSize?.size})`;
+
+      default:
+        return "";
+    }
+  };
+
 
   return (
     <ScreenLayout>
       <Header title="Drop Order" showBack />
       <View style={{ flex: 1, paddingHorizontal: SW(10), paddingTop: SH(15) }}>
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.rejectBtn}
           onPress={() => navigation.navigate('LiveOrderHelp', { OrderData })}
         >
           <Text style={styles.rejectText}>Reject</Text>
           <AntDesign name="close" size={SF(12)} color="red" style={{ marginLeft: SW(4) }} />
-        </TouchableOpacity>
+        </TouchableOpacity> */}
         <View style={styles.customerInfo}>
           <Text style={styles.customerName}>{OrderData.shippingAddress.name}</Text>
           <Text style={styles.address}>{OrderData.shippingAddress.address}</Text>
           <Text style={styles.address}>
             {`${OrderData.shippingAddress.city}, ${OrderData.shippingAddress.state} - ${OrderData.shippingAddress.postalCode}, ${OrderData.shippingAddress.country} (${OrderData.shippingAddress.addressType})`}
           </Text>
+
+          {OrderData?.rescheduled === true && OrderData?.rescheduledAt && (
+            <Text style={styles.reassignedText}>
+              Rescheduled by admin on{' '}
+              {new Date(OrderData.rescheduledAt).toLocaleString('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </Text>
+          )}
+
           <Text style={styles.orderId}>Order ID: {OrderData.orderId}</Text>
         </View>
         <View style={styles.callMapRow}>
@@ -76,6 +157,7 @@ const DropOrder: React.FC = () => {
             <Ionicons name="chevron-down-outline" size={14} color="black" />
           </View>
           <Text style={styles.restaurantName}>{OrderData.shippingAddress.name}</Text>
+
         </TouchableOpacity>
         <View style={{ marginTop: SH(15), flex: 1 }}>
           <SwipeButton
@@ -97,7 +179,7 @@ const DropOrder: React.FC = () => {
                 <Ionicons name="chevron-forward" size={SF(14)} color={Colors.dark_green} style={{ marginLeft: -5 }} />
               </View>
             )}
-            onSwipeSuccess={() => navigation.navigate('CashOnDelivery', { OrderData })}
+            onSwipeSuccess={handleReachedDrop}
             shouldResetAfterSuccess={false}
           />
         </View>
@@ -129,23 +211,46 @@ const DropOrder: React.FC = () => {
                   renderItem={({ item }) => (
                     <View style={styles.itemRow}>
                       <Image
-                        source={{ uri: `${BASE_URL}${item.images[0].startsWith('/') ? item.images[0] : '/' + item.images[0]}` }}
-                        style={{ width: SW(40), height: SH(40), borderRadius: SW(4), marginRight: SW(8) }}
+                        source={{
+                          uri: `${BASE_URL}${item.images[0].startsWith('/')
+                            ? item.images[0]
+                            : '/' + item.images[0]
+                            }`
+                        }}
+                        style={{
+                          width: SW(40),
+                          height: SH(40),
+                          borderRadius: SW(4),
+                          marginRight: SW(8)
+                        }}
                       />
 
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.itemName}>{item.name}</Text>
+                        <Text style={styles.itemName}>
+                          {item.name}
+                          {getProductVariantText(item)}
+                        </Text>
+
                         <Text style={[styles.itemName, { fontSize: SF(12), color: '#555' }]}>
                           Qty: {item.qty} × Price: {item.price.toFixed(2)} INR
                         </Text>
-                        <Text style={[styles.itemName, { fontSize: SF(12), color: '#555', fontWeight: 'bold' }]}>
+
+                        <Text
+                          style={[
+                            styles.itemName,
+                            { fontSize: SF(12), color: '#555', fontWeight: 'bold' }
+                          ]}
+                        >
                           Subtotal: {(item.qty * item.price).toFixed(2)} INR
                         </Text>
                       </View>
 
-                      <Text style={styles.itemPrice}>{(item.qty * item.price).toFixed(2)} INR</Text>
+                      <Text style={styles.itemPrice}>
+                        {(item.qty * item.price).toFixed(2)} INR
+                      </Text>
                     </View>
                   )}
+
                 />
 
                 <View style={styles.divider} />

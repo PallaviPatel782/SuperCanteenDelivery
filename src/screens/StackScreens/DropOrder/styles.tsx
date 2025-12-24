@@ -31,7 +31,7 @@ export default StyleSheet.create({
     marginVertical: SH(6),
     lineHeight: SH(18),
   },
- orderId: {
+  orderId: {
     fontFamily: 'Inter-Medium',
     fontSize: SF(15),
     color: Colors.black,
@@ -165,7 +165,7 @@ export default StyleSheet.create({
     color: Colors.darkGray,
     marginLeft: SW(6),
   },
-   overlayTouchable: {
+  overlayTouchable: {
     flex: 1,
     width: '100%',
   },
@@ -267,4 +267,10 @@ export default StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: Colors.black,
   },
+  reassignedText: {
+    marginVertical: SH(4),
+    fontSize: SF(12),
+    color: '#D9480F',
+    fontFamily: 'Inter-Regular',
+  }
 });

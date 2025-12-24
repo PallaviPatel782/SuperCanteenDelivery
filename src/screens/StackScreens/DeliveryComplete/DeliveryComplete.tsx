@@ -23,7 +23,11 @@ const DeliveryComplete = ({ route, navigation }: any) => {
         </View>
         <TouchableOpacity
           style={styles.deliverButton}
-          onPress={() => navigation.navigate('MainTabs')}
+          onPress={() =>
+            navigation.navigate('MainTabs', {
+              screen: 'Home',
+            })
+          }
         >
           <Text style={styles.deliverButtonText}>Get next order</Text>
         </TouchableOpacity>

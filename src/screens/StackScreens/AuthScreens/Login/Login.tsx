@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  Image,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, TextInput, Image, TouchableOpacity, } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import KeyboardAvoidWrapper from '../../../../components/KeyboardAvoidWrapper';
 import CustomButton from '../../../../components/CustomButton';
@@ -14,10 +8,10 @@ import styles from './styles';
 import { SH } from '../../../../utils/Responsiveness/Dimensions';
 import Colors from '../../../../utils/Colors/Colors';
 import { Lock, Eye, EyeOff } from 'lucide-react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-import { LOGIN_API } from '../../../../utils/apis/BASE_URL';
 import { showMessage } from "react-native-flash-message";
+import { useDispatch, useSelector } from 'react-redux';
+import { loginUser } from '../../../../redux/slices/authSlice';
+import { RootState, AppDispatch } from '../../../../redux/store';
 
 type RootStackParamList = {
   MainTabs: undefined;
@@ -29,10 +23,11 @@ type LoginScreenProps = {
 };
 
 const Login: React.FC<LoginScreenProps> = ({ navigation }) => {
+  const dispatch = useDispatch<AppDispatch>();
+  const { loading, error } = useSelector((state: RootState) => state.auth);
   const [contact, setContact] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(false);
 
   const handleContinue = async () => {
     if (contact.length !== 10 || password.length < 4) {
@@ -44,49 +39,29 @@ const Login: React.FC<LoginScreenProps> = ({ navigation }) => {
       return;
     }
 
-    try {
-      setLoading(true);
+    const result = await dispatch(
+      loginUser({ contactNo: contact, password })
+    );
 
-      const payload = {
-        contactNo: contact,
-        password: password,
-      };
-
-      console.log("payload", payload);
-      console.log("LOGIN_API",LOGIN_API);
-      const res = await axios.post(LOGIN_API, payload);
-      console.log("res.data", res.data);
-
-      if (res.data?.success) {
-        await AsyncStorage.setItem("authToken", res.data.token);
-        await AsyncStorage.setItem("userInfo", JSON.stringify(res.data.deliveryBoy));
-
-        showMessage({
-          message: "Login Successful 🎉",
-          description: `Welcome back ${res.data.deliveryBoy.name}`,
-          type: "success",
-          icon: "success",
-        });
-
-        navigation.navigate("MainTabs");
-      } else {
-        showMessage({
-          message: "Login Failed",
-          description: res.data?.message || "Something went wrong",
-          type: "danger",
-          icon: "danger",
-        });
-      }
-    } catch (error: any) {
-      console.log("LOGIN ERROR", error?.response?.data);
+    if (loginUser.fulfilled.match(result)) {
       showMessage({
-        message: "Login Error",
-        description: error?.response?.data?.message || "Something went wrong",
+        message: "Login Successful 🎉",
+        description: `Welcome back ${result.payload.user.name}`,
+        type: "success",
+        icon: "success",
+      });
+
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainTabs' }],
+      });
+    } else {
+      showMessage({
+        message: "Login Failed",
+        description: result.payload as string,
         type: "danger",
         icon: "danger",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -108,7 +83,7 @@ const Login: React.FC<LoginScreenProps> = ({ navigation }) => {
         <Image
           source={require('../../../../assets/Images/DeliveryBackgroundImage1.jpg')}
           style={styles.topImage}
-          resizeMode="contain"
+          resizeMode="cover"
         />
 
         <View style={styles.card}>

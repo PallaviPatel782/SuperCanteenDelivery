@@ -60,7 +60,7 @@ const ForgotPassword: React.FC<ForgotProps> = ({ navigation }) => {
         <Image
           source={require('../../../../assets/Images/DeliveryBackgroundImage1.jpg')}
           style={styles.topImage}
-          resizeMode="contain"
+          resizeMode="cover"
         />
 
         <View style={styles.card}>

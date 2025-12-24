@@ -12,9 +12,9 @@ import { BASE_URL } from "../../../utils/apis/BASE_URL";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../../navigation/AppNavigator";
 import { showMessage } from "react-native-flash-message";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { navigationRef } from "../../../navigation/NavigationService";
 import Colors from "../../../utils/Colors/Colors";
+import { logoutUser } from "../../../redux/slices/authSlice";
+import InternetStatus from "../../../components/InternetStatus";
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -31,8 +31,8 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const { loading, data } = useSelector((state: RootState) => state.profile);
 
   useEffect(() => {
-    console.log("data",data);
     dispatch(fetchProfile());
+    console.log("data", data);
   }, []);
 
   if (loading || !data) {
@@ -43,98 +43,99 @@ const ProfileScreen: React.FC<Props> = ({ navigation }) => {
     );
   }
 
- const handleLogout = async () => {
-  try {
-    await AsyncStorage.removeItem("authToken");
-    await AsyncStorage.removeItem("userInfo");
-    showMessage({
-      message: "Logged out successfully",
-      type: "success",
-      icon: "success",
-    });
-    navigationRef.current?.reset({
-      index: 0,
-      routes: [{ name: "Login" }],
-    });
-  } catch (error) {
-    console.log("Logout error:", error);
-    showMessage({
-      message: "Logout failed",
-      description: "Something went wrong",
-      type: "danger",
-      icon: "danger",
-    });
-  }
-};
+  const handleLogout = async () => {
+    const result = await dispatch(logoutUser());
+
+    if (logoutUser.fulfilled.match(result)) {
+      showMessage({
+        message: "Logged out successfully",
+        type: "success",
+        icon: "success",
+      });
+    } else {
+      showMessage({
+        message: "Logout failed",
+        description: "Something went wrong",
+        type: "danger",
+        icon: "danger",
+      });
+    }
+  };
+
+
   return (
-    <KeyboardAvoidWrapper
-      bottomComponent={
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            gap: SW(5),
-          }}
-        >
-          <View style={{ flex: 1 }}>
-            <CustomButton
-              title="Logout"
-              onPress={handleLogout}
-              Icon={<LogOut size={18} color="#fff" />}
-            />
-          </View>
+    <>
+      <InternetStatus onReconnect={() => dispatch(fetchProfile())} />
 
-          <View style={{ flex: 1 }}>
-            <CustomButton
-              title="Contact Support"
-              onPress={() => navigation.navigate("ContactSupport")}
-              Icon={<Phone size={18} color="#fff" />}
-            />
-          </View>
-        </View>
-      }
-    >
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <Image
-          source={require("../../../assets/Images/DeliveryBackgroundImage.jpg")}
-          style={styles.topImage}
-          resizeMode="cover"
-        />
+      <KeyboardAvoidWrapper
+        bottomComponent={
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              gap: SW(5),
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <CustomButton
+                title="Logout"
+                onPress={handleLogout}
+                Icon={<LogOut size={18} color="#fff" />}
+              />
+            </View>
 
-        <View style={styles.card}>
+            <View style={{ flex: 1 }}>
+              <CustomButton
+                title="Contact Support"
+                onPress={() => navigation.navigate("ContactSupport")}
+                Icon={<Phone size={18} color="#fff" />}
+              />
+            </View>
+          </View>
+        }
+      >
+        <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
           <Image
-            source={
-              data.profilePhoto
-                ? { uri: BASE_URL + "/" + data.profilePhoto }
-                : require("../../../assets/Images/user.png")
-            }
-            style={styles.avatar}
+            source={require("../../../assets/Images/DeliveryBackgroundImage.jpg")}
+            style={styles.topImage}
+            resizeMode="cover"
           />
 
-          <View style={styles.infoCard}>
-            <View style={styles.row}>
-              <Text style={styles.label}>Name</Text>
-              <Text style={styles.value}>{data.name}</Text>
-            </View>
+          <View style={styles.card}>
+            <Image
+              source={
+                data.profilePhoto
+                  ? { uri: BASE_URL + "/" + data.profilePhoto }
+                  : require("../../../assets/Images/user.png")
+              }
+              style={styles.avatar}
+            />
 
-            <View style={styles.row}>
-              <Text style={styles.label}>Email</Text>
-              <Text style={styles.value}>{data.email}</Text>
-            </View>
+            <View style={styles.infoCard}>
+              <View style={styles.row}>
+                <Text style={styles.label}>Name</Text>
+                <Text style={styles.value}>{data.name}</Text>
+              </View>
 
-            <View style={styles.row}>
-              <Text style={styles.label}>Phone</Text>
-              <Text style={styles.value}>{data.contactNo}</Text>
-            </View>
+              <View style={styles.row}>
+                <Text style={styles.label}>Email</Text>
+                <Text style={styles.value}>{data.email}</Text>
+              </View>
 
-            {/* <View style={styles.row}>
+              <View style={styles.row}>
+                <Text style={styles.label}>Phone</Text>
+                <Text style={styles.value}>{data.contactNo}</Text>
+              </View>
+
+              {/* <View style={styles.row}>
               <Text style={styles.label}>City</Text>
               <Text style={styles.value}>{data.address?.city || "-"}</Text>
             </View> */}
+            </View>
           </View>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidWrapper>
+        </ScrollView>
+      </KeyboardAvoidWrapper>
+    </>
   );
 };
 

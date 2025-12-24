@@ -17,8 +17,8 @@ function MainApp() {
       <AppNavigator />
 
       <FlashMessage
-        position="bottom"
-        style={{ marginBottom: insets.bottom }}
+        position="top"
+        style={{ marginBottom: insets.bottom,marginTop:insets.top }}
         floating
       />
     </SafeAreaView>

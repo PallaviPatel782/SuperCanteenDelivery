@@ -10,6 +10,7 @@ import {
   Linking,
   Alert,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import Header from '../../../components/Header';
 import ScreenLayout from '../../../components/ScreenLayout';
@@ -19,12 +20,19 @@ import styles from './styles';
 import { SH, SW, SF } from '../../../utils/Responsiveness/Dimensions';
 import SwipeButton from 'rn-swipe-button';
 import { BASE_URL } from '../../../utils/apis/BASE_URL';
+import { completeDeliveryOrder } from '../../../redux/slices/assignedOrdersSlice';
+import { useDispatch } from 'react-redux';
+import { showMessage } from 'react-native-flash-message';
+import AntDesign from 'react-native-vector-icons/AntDesign';
 
 const CashOnDelivery = ({ route, navigation }: any) => {
+  const dispatch = useDispatch<any>();
   const { OrderData } = route.params || {};
+  console.log("OrderData", OrderData);
 
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [showOtpModal, setShowOtpModal] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
 
@@ -37,20 +45,82 @@ const CashOnDelivery = ({ route, navigation }: any) => {
     }
   };
 
-  const handleOtpVerify = () => {
-    setShowOtpModal(false);
-    navigation.navigate('DeliveryComplete', { OrderData });
+  const handleOtpVerify = async () => {
+    if (otp.length !== 6) {
+      setError("Please enter valid 6-digit OTP");
+      return;
+    }
+
+    setLoading(true);
+
+    const result = await dispatch(
+      completeDeliveryOrder({
+        orderId: OrderData._id,
+        otp,
+      })
+    );
+
+    setLoading(false);
+
+    if (completeDeliveryOrder.fulfilled.match(result)) {
+      showMessage({
+        message: result.payload.message,
+        type: "success",
+        icon: "success",
+        position: "top",
+        floating: true,
+        style:{marginTop:SH(50)}
+      });
+
+      setShowOtpModal(false);
+      navigation.navigate("DeliveryComplete");
+    } else {
+      showMessage({
+        message: result.payload || "Failed to complete delivery",
+        type: "danger",
+        icon: "danger",
+        position: "top",
+        floating: true,
+      });
+    }
   };
 
-  const totalAmount = OrderData?.orderItems?.reduce(
-    (sum: number, item: any) => sum + item.price * item.qty,
-    0
-  );
+  const getProductVariantText = (item: any) => {
+    switch (item.productType) {
+      case "Single":
+        return "";
+
+      case "WeightPack":
+        return ` (${item.weightPack?.size})`;
+
+      case "ColorSize":
+        return ` (${item.colorSize?.color?.name}, Size: ${item.colorSize?.size})`;
+
+      default:
+        return "";
+    }
+  };
+
+  {
+    loading && (
+      <View style={styles.loaderOverlay}>
+        <ActivityIndicator size="large" color={Colors.White} />
+      </View>
+    )
+  }
 
   return (
     <ScreenLayout>
       <Header title="Cash On Delivery" showBack />
       <View style={{ flex: 1, paddingHorizontal: SW(10), paddingTop: SH(15) }}>
+        <TouchableOpacity
+          style={styles.rejectBtn}
+          onPress={() => navigation.navigate('LiveOrderHelp', { OrderData })}
+        >
+          <Text style={styles.rejectText}>Reject</Text>
+          <AntDesign name="close" size={SF(12)} color="red" style={{ marginLeft: SW(4) }} />
+        </TouchableOpacity>
+
         <View style={styles.paymentRow}>
           <Ionicons name="checkmark-circle-outline" size={30} color={Colors.dark_green} />
           <View style={{ marginLeft: 10 }}>
@@ -132,25 +202,47 @@ const CashOnDelivery = ({ route, navigation }: any) => {
                   renderItem={({ item }) => (
                     <View style={styles.itemRow}>
                       <Image
-                        source={{ uri: `${BASE_URL}${item.images[0].startsWith('/') ? item.images[0] : '/' + item.images[0]}` }}
-                        style={{ width: SW(40), height: SH(40), borderRadius: SW(4), marginRight: SW(8) }}
+                        source={{
+                          uri: `${BASE_URL}${item.images[0].startsWith('/')
+                            ? item.images[0]
+                            : '/' + item.images[0]
+                            }`
+                        }}
+                        style={{
+                          width: SW(40),
+                          height: SH(40),
+                          borderRadius: SW(4),
+                          marginRight: SW(8)
+                        }}
                       />
 
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.itemName}>{item.name}</Text>
+                        <Text style={styles.itemName}>
+                          {item.name}
+                          {getProductVariantText(item)}
+                        </Text>
+
                         <Text style={[styles.itemName, { fontSize: SF(12), color: '#555' }]}>
                           Qty: {item.qty} × Price: {item.price.toFixed(2)} INR
                         </Text>
-                        <Text style={[styles.itemName, { fontSize: SF(12), color: '#555', fontWeight: 'bold' }]}>
+
+                        <Text
+                          style={[
+                            styles.itemName,
+                            { fontSize: SF(12), color: '#555', fontWeight: 'bold' }
+                          ]}
+                        >
                           Subtotal: {(item.qty * item.price).toFixed(2)} INR
                         </Text>
                       </View>
 
-                      <Text style={styles.itemPrice}>{(item.qty * item.price).toFixed(2)} INR</Text>
+                      <Text style={styles.itemPrice}>
+                        {(item.qty * item.price).toFixed(2)} INR
+                      </Text>
                     </View>
                   )}
-                />
 
+                />
                 <View style={styles.divider} />
                 <View style={styles.totalRow}>
                   <Text style={styles.totalText}>Items Total</Text>
@@ -174,7 +266,7 @@ const CashOnDelivery = ({ route, navigation }: any) => {
             <View style={styles.otpCard}>
               <Ionicons name="shield-checkmark-outline" size={50} color={Colors.dark_green} />
               <Text style={styles.otpTitle}>Enter Delivery OTP</Text>
-              <Text style={styles.otpSubtitle}>Customer will share a 4-digit OTP</Text>
+              <Text style={styles.otpSubtitle}>Customer will share a 6-digit OTP</Text>
 
               <TextInput
                 value={otp}
@@ -183,14 +275,27 @@ const CashOnDelivery = ({ route, navigation }: any) => {
                   setError('');
                 }}
                 keyboardType="number-pad"
-                maxLength={4}
+                maxLength={6}
                 placeholder="Enter OTP"
                 style={styles.otpInput}
               />
               {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-              <TouchableOpacity style={styles.verifyBtn} onPress={handleOtpVerify}>
-                <Text style={styles.verifyBtnText}>Verify & Complete Delivery</Text>
+              <TouchableOpacity
+                style={[
+                  styles.verifyBtn,
+                  loading && { opacity: 0.7 }
+                ]}
+                onPress={handleOtpVerify}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.verifyBtnText}>
+                    Verify & Complete Delivery
+                  </Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity onPress={() => setShowOtpModal(false)}>

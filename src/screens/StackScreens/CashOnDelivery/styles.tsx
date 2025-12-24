@@ -256,6 +256,7 @@ export default StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.4)",
+    marginTop: SH(55)
   },
 
   otpCard: {
@@ -301,6 +302,9 @@ export default StyleSheet.create({
     paddingVertical: SH(10),
     paddingHorizontal: SW(20),
     borderRadius: 8,
+    height: SH(45),
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   verifyBtnText: {
@@ -328,5 +332,29 @@ export default StyleSheet.create({
     alignSelf: "center",
     resizeMode: "contain",
   },
-
+  rejectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffecec',
+    borderRadius: SW(16),
+    paddingHorizontal: SW(10),
+    paddingVertical: SH(4),
+    alignSelf: 'flex-end',
+  },
+  rejectText: {
+    color: "red",
+    fontFamily: 'Inter-Medium',
+    fontSize: SF(13),
+  },
+  loaderOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  }
 });

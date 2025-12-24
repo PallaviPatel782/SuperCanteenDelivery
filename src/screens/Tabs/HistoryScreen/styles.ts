@@ -29,11 +29,12 @@ export default StyleSheet.create({
 
   historyCard: {
     marginTop: SH(-8),
-    backgroundColor:"#f6f7f9ff",
+    backgroundColor: "#f6f7f9ff",
     paddingHorizontal: SH(14),
     paddingVertical: SH(8),
     borderRadius: 16,
     borderWidth: 1,
+    borderTopLeftRadius: 0,
     borderColor: '#EAEAEA',
     elevation: 4,
     shadowColor: '#00000040',
@@ -92,6 +93,5 @@ export default StyleSheet.create({
     color: '#C27A00',
     fontSize: SF(11),
   },
-
 
 });

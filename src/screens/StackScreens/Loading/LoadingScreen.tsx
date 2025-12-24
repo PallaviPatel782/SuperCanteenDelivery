@@ -1,43 +1,38 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Animated, Image, StyleSheet } from 'react-native';
-import { SH, SW } from '../../../utils/Responsiveness/Dimensions';
-import Colors from '../../../utils/Colors/Colors';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useEffect, useRef } from "react";
+import { View, Animated, Image, StyleSheet } from "react-native";
+import { useDispatch } from "react-redux";
+import { SH, SW } from "../../../utils/Responsiveness/Dimensions";
+import Colors from "../../../utils/Colors/Colors";
+import { restoreAuth } from "../../../redux/slices/authSlice";
+import { AppDispatch } from "../../../redux/store";
 
-const LoadingScreen = ({ navigation }: any) => {
+const LoadingScreen = () => {
+  const dispatch = useDispatch<AppDispatch>();
   const logoScaleAnimation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(logoScaleAnimation, {
-      toValue: 1,     
-      duration: 900,  
+      toValue: 1,
+      duration: 900,
       useNativeDriver: true,
     }).start();
 
-    const timer = setTimeout(async () => {
-      const token = await AsyncStorage.getItem('authToken');
-      if (token) {
-        navigation.replace('MainTabs'); 
-      } else {
-        navigation.replace('Login');   
-      }
-    }, 2000);
+    const timer = setTimeout(() => {
+      dispatch(restoreAuth());
+    }, 1500);
 
     return () => clearTimeout(timer);
-  }, [logoScaleAnimation, navigation]);
+  }, []);
 
   return (
     <View style={styles.container}>
       <Animated.View
-        style={[
-          styles.logoContainer,
-          {
-            transform: [{ scale: logoScaleAnimation }],
-          },
-        ]}
+        style={{
+          transform: [{ scale: logoScaleAnimation }],
+        }}
       >
         <Image
-          source={require('../../../assets/Images/DeliveryLogo.jpeg')}
+          source={require("../../../assets/Images/DeliveryLogo.jpeg")}
           style={styles.logo}
         />
       </Animated.View>

@@ -103,6 +103,7 @@ export default StyleSheet.create({
         borderRadius: 16,
         borderWidth: 1,
         borderColor: '#EAEAEA',
+         borderTopLeftRadius:0,
         elevation: 4,
         shadowColor: '#00000040',
     },

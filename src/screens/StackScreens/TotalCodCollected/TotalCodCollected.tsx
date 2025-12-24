@@ -1,72 +1,81 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity } from 'react-native';
-import styles from './styles';
-import ScreenLayout from '../../../components/ScreenLayout';
-import Header from '../../../components/Header';
-import Colors from '../../../utils/Colors/Colors';
-import { SH, SW } from '../../../utils/Responsiveness/Dimensions';
-import { CheckCircle, Package, UserCheck2Icon, Calendar } from 'lucide-react-native';
-import CommonFilterModal from '../../../components/CommonFilterModal';
-import Fonts from '../../../utils/Fonts/Fonts';
-import { completedOrders } from '../../../DummyData/OrdersData';
-
+import { useSelector } from 'react-redux';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../../navigation/AppNavigator';
+import { RootState } from '../../../redux/store';
 
-// -------- Correct Prop Type --------
-type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'TotalCodCollected'>;
-};
+import ScreenLayout from '../../../components/ScreenLayout';
+import Header from '../../../components/Header';
+import styles from './styles';
+import Colors from '../../../utils/Colors/Colors';
+import Fonts from '../../../utils/Fonts/Fonts';
+import { SH, SW } from '../../../utils/Responsiveness/Dimensions';
+import CommonFilterModal from '../../../components/CommonFilterModal';
+import { useFocusEffect } from '@react-navigation/native';
 
-export type HistoryItem = any;
+import { CheckCircle, Package, UserCheck2Icon, Calendar } from 'lucide-react-native';
+
+type NavProp = NativeStackNavigationProp<RootStackParamList, 'TotalCodCollected'>;
+
+interface Props {
+  navigation: NavProp;
+}
 
 const TotalCodCollected: React.FC<Props> = ({ navigation }) => {
-
-  const [filterType, setFilterType] = useState<
-    'ALL' | 'COD' | 'Prepaid' | 'Today' | 'Month' | 'Custom'
-  >('ALL');
+  const { data: orders = [] } = useSelector(
+    (state: RootState) => state.assignedOrders
+  );
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      day: 'numeric',
-      month: 'short',
-    });
+  useFocusEffect(
+    useCallback(() => {
+      setSelectedFilters([]);
+      setStartDate(null);
+      setEndDate(null);
+    }, [])
+  );
+
+  const baseList = orders.filter(o =>
+    o.isCOD &&
+    o.status === 'Delivered' &&
+    o.deliveredAt &&
+    new Date(o.deliveredAt).toDateString() === new Date().toDateString()
+  );
+
+  const parseLocalDate = (dateStr: string) => {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    return new Date(y, m - 1, d);
   };
 
-  const getTotalCODAmount = (list: HistoryItem[]) => {
-    const filteredCOD = list.filter(item => item.paymentType === 'COD');
-    return filteredCOD.reduce((acc, item) => {
-      const amountNumber = Number(item.amount.replace(/[^0-9]/g, ''));
-      return acc + amountNumber;
-    }, 0);
-  };
+  const filteredList = baseList.filter(order => {
+    let match = true;
+    const orderDate = new Date(order.deliveredAt);
 
-  const getFilterMessage = (list: HistoryItem[]) => {
-    const totalCOD = getTotalCODAmount(list);
-
-    if (filterType === 'COD') return `Your COD Records - Total ₹${totalCOD}`;
-    if (filterType === 'Prepaid') return `Your Paid Records${totalCOD ? ` - COD ₹${totalCOD}` : ''}`;
-    if (filterType === 'Today') return `Your Today's Records${totalCOD ? ` - COD ₹${totalCOD}` : ''}`;
-    if (filterType === 'Month') return `Your This Month Records${totalCOD ? ` - COD ₹${totalCOD}` : ''}`;
-
-    if (filterType === 'Custom' && startDate && endDate) {
-      return `Your Records from ${formatDate(startDate)} to ${formatDate(endDate)}${totalCOD
-        ? ` - COD ₹${totalCOD}`
-        : ''}`;
+    if (selectedFilters.includes("Today")) {
+      match = match && orderDate.toDateString() === new Date().toDateString();
     }
 
-    return `All Records${totalCOD ? ` - COD ₹${totalCOD}` : ''}`;
-  };
+    if (selectedFilters.includes("Custom Date") && startDate && endDate) {
+      const start = parseLocalDate(startDate);
+      const end = parseLocalDate(endDate);
+      end.setHours(23, 59, 59, 999);
+      match = match && orderDate >= start && orderDate <= end;
+    }
 
-  const filteredList = completedOrders.filter(i => i.paymentType === 'COD');
+    return match;
+  });
 
+  const totalCODAmount = filteredList.reduce(
+    (sum, o) => sum + (o.totalPrice || 0),
+    0
+  );
 
-  const renderItem = ({ item }: { item: HistoryItem }) => (
+  const renderItem = ({ item }: any) => (
     <TouchableOpacity
       style={styles.cardWrapper}
       onPress={() =>
@@ -78,50 +87,38 @@ const TotalCodCollected: React.FC<Props> = ({ navigation }) => {
           },
         })
       }
-
     >
       <View style={styles.ribbon}>
         <CheckCircle size={12} color="#fff" style={{ marginRight: 5 }} />
-        <Text style={styles.ribbonText}>{item.status}</Text>
+        <Text style={styles.ribbonText}>Delivered</Text>
       </View>
 
       <View style={styles.historyCard}>
         <View style={styles.rowBetween}>
           <View style={styles.row}>
             <Package size={11} color={Colors.primary} style={{ marginRight: 6 }} />
-            <Text style={styles.orderId}>{item.id}</Text>
+            <Text style={styles.orderId}>{item.orderId}</Text>
           </View>
 
-          <View
-            style={[
-              styles.paymentBadge,
-              { backgroundColor: item.paymentType === 'COD' ? '#FFF2F0' : '#E6F7FF' },
-            ]}
-          >
-            <Text
-              style={[
-                styles.paymentText,
-                { color: item.paymentType === 'COD' ? '#D9480F' : '#096DD9' },
-              ]}
-            >
-              {item.paymentType}
-            </Text>
+          <View style={[styles.paymentBadge, { backgroundColor: '#FFF2F0' }]}>
+            <Text style={[styles.paymentText, { color: '#D9480F' }]}>COD</Text>
           </View>
         </View>
 
         <View style={styles.row}>
           <UserCheck2Icon size={11} color={Colors.primary} style={{ marginRight: 6 }} />
-          <Text style={styles.customerName}>{item.name}</Text>
+          <Text style={styles.customerName}>{item.shippingAddress?.name}</Text>
         </View>
 
         <View style={styles.rowBetween}>
           <View style={styles.row}>
             <Calendar size={11} color={Colors.primary} style={{ marginRight: 4 }} />
-            <Text style={styles.date}>{item.time}</Text>
+            <Text style={styles.date}>
+              {new Date(item.deliveredAt).toLocaleDateString()}
+            </Text>
           </View>
-
           <View style={styles.priceTag}>
-            <Text style={styles.priceText}>{item.amount}</Text>
+            <Text style={styles.priceText}>₹{item.totalPrice}</Text>
           </View>
         </View>
       </View>
@@ -130,58 +127,43 @@ const TotalCodCollected: React.FC<Props> = ({ navigation }) => {
 
   return (
     <ScreenLayout scrollable={false}>
-      <Header showBack={true} title="COD Records" />
+      <Header
+        showBack
+        title="COD Records"
+        // rightIcon="filter-outline"
+        // onRightPress={() => setModalVisible(true)}
+      />
 
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: SW(10),
-          marginVertical: SH(10),
-        }}
-      >
-        <View style={{ flex: 1, height: 1, backgroundColor: '#ccc' }} />
-
-        <Text
-          style={{
-            marginHorizontal: SW(8),
-            fontSize: SH(12),
-            fontFamily: Fonts.Inter_Medium,
-            color: Colors.darkGray,
-            textAlign: 'center',
-          }}
-        >
-          {getFilterMessage(filteredList)}
+      <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: SW(10), marginVertical: SH(10) }}>
+        <View style={{ flex: 1, height: 1, backgroundColor: "#ccc" }} />
+        <Text style={{ marginHorizontal: SW(8), fontSize: SH(12), fontFamily: Fonts.Inter_Medium, color: Colors.darkGray }}>
+          Total ₹{totalCODAmount}
         </Text>
-
-        <View style={{ flex: 1, height: 1, backgroundColor: '#ccc' }} />
+        <View style={{ flex: 1, height: 1, backgroundColor: "#ccc" }} />
       </View>
 
-      <View style={{ flex: 1, paddingHorizontal: SW(10) }}>
-        <FlatList
-          data={filteredList}
-          renderItem={renderItem}
-          keyExtractor={item => item.id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: SH(120) }}
-        />
-      </View>
+      <FlatList
+        data={filteredList}
+        renderItem={renderItem}
+        keyExtractor={item => item._id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: SH(120), paddingHorizontal: SW(10) }}
+      />
 
       <CommonFilterModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        options={[
-          { title: 'Payment Type', data: ['COD', 'Prepaid'] },
-          { title: 'Date', data: ['Today', 'Month', 'Custom Date'] },
-        ]}
-        onSelect={(value, dateRange) => {
-          if (value === 'Custom Date' && dateRange) {
-            const [start, end] = dateRange.split('|');
-            setStartDate(start);
-            setEndDate(end);
-            setFilterType('Custom');
+        options={[{ title: 'Date', data: ['Today', 'Custom Date'] }]}
+        selectedFilters={selectedFilters}
+        startDate={startDate || undefined}
+        endDate={endDate || undefined}
+        onApply={(filters, range) => {
+          setSelectedFilters(filters);
+          if (filters.includes("Custom Date") && range) {
+            const [s, e] = range.split("|");
+            setStartDate(s);
+            setEndDate(e);
           } else {
-            setFilterType(value as any);
             setStartDate(null);
             setEndDate(null);
           }

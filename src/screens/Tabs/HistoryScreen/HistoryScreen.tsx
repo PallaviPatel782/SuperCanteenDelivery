@@ -1,159 +1,283 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity } from 'react-native';
-import styles from './styles';
-import ScreenLayout from '../../../components/ScreenLayout';
-import Header from '../../../components/Header';
-import Colors from '../../../utils/Colors/Colors';
-import { SH, SW } from '../../../utils/Responsiveness/Dimensions';
-import { CheckCircle, Package, UserCheck2Icon, Calendar } from 'lucide-react-native';
-import CommonFilterModal from '../../../components/CommonFilterModal';
-import Fonts from '../../../utils/Fonts/Fonts';
-import { completedOrders } from '../../../DummyData/OrdersData';
+import React, { useState, useCallback, useEffect } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  ActivityIndicator,
+  TouchableOpacity,
+  RefreshControl,
+} from "react-native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  CheckCircle,
+  Package,
+  UserCheck2Icon,
+  Calendar,
+} from "lucide-react-native";
+import { useFocusEffect } from "@react-navigation/native";
 
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { HistoryStackParamList } from '../../../navigation/AppNavigator';
+import ScreenLayout from "../../../components/ScreenLayout";
+import Header from "../../../components/Header";
+import CommonFilterModal from "../../../components/CommonFilterModal";
+import EmptyState from "../../../components/EmptyState";
+import InternetStatus from "../../../components/InternetStatus";
 
-export type HistoryItem = any;
+import Colors from "../../../utils/Colors/Colors";
 
-type HistoryNavProp = NativeStackNavigationProp<
+import {
   HistoryStackParamList,
-  'HistoryMain'
+  OrderType,
+} from "../../../navigation/AppNavigator";
+import { AppDispatch, RootState } from "../../../redux/store";
+import { fetchAssignedOrders } from "../../../redux/slices/assignedOrdersSlice";
+
+import styles from "./styles";
+import { SH, SW } from "../../../utils/Responsiveness/Dimensions";
+import Fonts from "../../../utils/Fonts/Fonts";
+
+export type HistoryNavProp = NativeStackNavigationProp<
+  HistoryStackParamList,
+  "HistoryMain"
 >;
 
-interface Props {
-  navigation: HistoryNavProp;
-}
+const PAGE_LIMIT = 10;
 
-const HistoryScreen: React.FC<Props> = ({ navigation }) => {
+const HistoryScreen: React.FC<{ navigation: HistoryNavProp }> = ({
+  navigation,
+}) => {
+  const dispatch = useDispatch<AppDispatch>();
+  const { data: orders = [], loading } = useSelector(
+    (state: RootState) => state.assignedOrders
+  );
 
-  const [filterType, setFilterType] = useState<
-    'ALL' | 'COD' | 'Prepaid' | 'Today' | 'Month' | 'Custom'
-  >('ALL');
+  const [page, setPage] = useState(1);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
 
-  const AllcompletedOrders = completedOrders;
+  useFocusEffect(
+    useCallback(() => {
+      console.log(" History focused → reset & load");
 
-  const applyFilter = () => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
+      setPage(1);
+      setSelectedFilters([]);
+      setStartDate(null);
+      setEndDate(null);
 
-    switch (filterType) {
-      case 'COD':
-        return AllcompletedOrders.filter(i => i.paymentType === 'COD');
+      dispatch(
+        fetchAssignedOrders({
+          status: "Delivered",
+          page: 1,
+          limit: PAGE_LIMIT,
+        })
+      );
 
-      case 'Prepaid':
-        return AllcompletedOrders.filter(i => i.paymentType === 'Prepaid');
+      return () => {
+        console.log(" Leaving History → clear filters");
+        setSelectedFilters([]);
+        setStartDate(null);
+        setEndDate(null);
+      };
+    }, [])
+  );
 
-      case 'Today':
-        return AllcompletedOrders.filter(
-          i => new Date(i.time).toDateString() === now.toDateString()
-        );
 
-      case 'Month':
-        return AllcompletedOrders.filter(
-          i => new Date(i.time).getMonth() === currentMonth
-        );
+  const loadMore = () => {
+    if (!loading && orders.length >= PAGE_LIMIT) {
+      const nextPage = page + 1;
+      console.log(" Load more triggered, page:", nextPage);
 
-      case 'Custom':
-        if (startDate && endDate) {
-          return AllcompletedOrders.filter(i => {
-            const d = new Date(i.time);
-            return d >= new Date(startDate) && d <= new Date(endDate);
-          });
-        }
-        return AllcompletedOrders;
-
-      default:
-        return AllcompletedOrders;
+      setPage(nextPage);
+      dispatch(
+        fetchAssignedOrders({
+          status: "Delivered",
+          page: nextPage,
+          limit: PAGE_LIMIT,
+        })
+      );
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      day: 'numeric',
-      month: 'short',
+
+  const onRefresh = async () => {
+    console.log(" Pull to refresh");
+    setRefreshing(true);
+    setPage(1);
+
+    await dispatch(
+      fetchAssignedOrders({
+        status: "Delivered",
+        page: 1,
+        limit: PAGE_LIMIT,
+      })
+    );
+
+    setRefreshing(false);
+  };
+
+  const applyFrontendFilters = (list: OrderType[]) => {
+    console.log(" Applying frontend filters:", selectedFilters);
+
+    return list.filter((order) => {
+      let match = true;
+      const now = new Date();
+      const orderDate = order.deliveredAt
+        ? new Date(order.deliveredAt)
+        : new Date(order._id);
+
+
+      const paymentFilters = selectedFilters.filter(
+        f => f === "COD" || f === "Prepaid"
+      );
+
+      if (paymentFilters.length) {
+        match =
+          match &&
+          paymentFilters.some(f =>
+            f === "COD" ? order.isCOD : !order.isCOD
+          );
+      }
+
+
+      if (selectedFilters.includes("Today")) {
+        match = match && orderDate.toDateString() === now.toDateString();
+      }
+
+
+      if (selectedFilters.includes("Month")) {
+        match =
+          match &&
+          orderDate.getMonth() === now.getMonth() &&
+          orderDate.getFullYear() === now.getFullYear();
+      }
+
+      if (
+        selectedFilters.includes("Custom Date") &&
+        startDate &&
+        endDate
+      ) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        match = match && orderDate >= start && orderDate <= end;
+      }
+
+      return match;
     });
   };
 
-  const getTotalCODAmount = (list: HistoryItem[]) => {
-    const filteredCOD = list.filter(item => item.paymentType === 'COD');
-    return filteredCOD.reduce((acc, item) => {
-      const amountNumber = Number(item.amount.replace(/[^0-9]/g, ''));
-      return acc + amountNumber;
-    }, 0);
+  const filteredList = applyFrontendFilters(orders);
+
+  useEffect(() => {
+    console.log("📦 Total orders from API:", orders.length);
+    console.log("✅ After filter:", filteredList.length);
+  }, [orders, selectedFilters]);
+
+
+  const formatDateShort = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+    });
   };
 
-  const getFilterMessage = (list: HistoryItem[]) => {
-    const totalCOD = getTotalCODAmount(list);
 
-    if (filterType === 'COD') return `Your COD Records - Total ₹${totalCOD}`;
-    if (filterType === 'Prepaid') return `Your Paid Records${totalCOD ? ` - COD ₹${totalCOD}` : ''}`;
-    if (filterType === 'Today') return `Your Today's Records${totalCOD ? ` - COD ₹${totalCOD}` : ''}`;
-    if (filterType === 'Month') return `Your This Month Records${totalCOD ? ` - COD ₹${totalCOD}` : ''}`;
+  const getFilterMessage = () => {
+    if (selectedFilters.length === 0) return "All Records";
 
-    if (filterType === 'Custom' && startDate && endDate) {
-      return `Your Records from ${formatDate(startDate)} to ${formatDate(endDate)}${totalCOD
-        ? ` - COD ₹${totalCOD}`
-        : ''}`;
+    const parts: string[] = [...selectedFilters];
+
+    if (
+      (selectedFilters.includes("COD") ||
+        selectedFilters.includes("Prepaid")) &&
+      filteredList.length
+    ) {
+      const total = filteredList.reduce(
+        (sum, o) => sum + o.totalPrice,
+        0
+      );
+      parts.push(`Total: ₹${total}`);
     }
 
-    return `All Records${totalCOD ? ` - COD ₹${totalCOD}` : ''}`;
+    if (selectedFilters.includes("Custom Date") && startDate && endDate) {
+      parts.push(
+        `${formatDateShort(startDate)} - ${formatDateShort(endDate)}`
+      );
+    }
+
+    return `Filtered: ${parts.join(" | ")}`;
   };
 
-  const filteredList = applyFilter();
+  if (loading && !refreshing) {
+    return (
+      <ScreenLayout>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={{ marginTop: 10, color: Colors.primary }}>Loading Not Delivery History...</Text>
+        </View>
+      </ScreenLayout>
+    );
+  }
 
-const renderItem = ({ item }: { item: HistoryItem }) => (
+  const renderItem = ({ item }: { item: OrderType }) => (
     <TouchableOpacity
       style={styles.cardWrapper}
-      onPress={() => navigation.navigate('AllDeliveryRecordData', { order: item })}
+      onPress={() =>
+        navigation.navigate("AllDeliveryRecordData", { order: item })
+      }
     >
       <View style={styles.ribbon}>
-        <CheckCircle size={12} color="#fff" style={{ marginRight: 5 }} />
+        <CheckCircle size={12} color="#fff" />
         <Text style={styles.ribbonText}>{item.status}</Text>
       </View>
 
       <View style={styles.historyCard}>
         <View style={styles.rowBetween}>
           <View style={styles.row}>
-            <Package size={11} color={Colors.primary} style={{ marginRight: 6 }} />
-            <Text style={styles.orderId}>{item.id}</Text>
+            <Package size={11} color={Colors.primary} />
+            <Text style={styles.orderId}>{item.orderId}</Text>
           </View>
 
           <View
             style={[
               styles.paymentBadge,
-              { backgroundColor: item.paymentType === 'COD' ? '#FFF2F0' : '#E6F7FF' },
+              { backgroundColor: item.isCOD ? "#FFF2F0" : "#E6F7FF" },
             ]}
           >
             <Text
               style={[
                 styles.paymentText,
-                { color: item.paymentType === 'COD' ? '#D9480F' : '#096DD9' },
+                { color: item.isCOD ? "#D9480F" : "#096DD9" },
               ]}
             >
-              {item.paymentType}
+              {item.isCOD ? "COD" : "Prepaid"}
             </Text>
           </View>
         </View>
 
         <View style={styles.row}>
-          <UserCheck2Icon size={11} color={Colors.primary} style={{ marginRight: 6 }} />
-          <Text style={styles.customerName}>{item.name}</Text>
+          <UserCheck2Icon size={11} color={Colors.primary} />
+          <Text style={styles.customerName}>
+            {item.shippingAddress?.name || item.user.username}
+          </Text>
         </View>
 
         <View style={styles.rowBetween}>
           <View style={styles.row}>
-            <Calendar size={11} color={Colors.primary} style={{ marginRight: 4 }} />
-            <Text style={styles.date}>{item.time}</Text>
+            <Calendar size={11} color={Colors.primary} />
+            <Text style={styles.date}>
+              {item.deliveredAt
+                ? new Date(item.deliveredAt).toLocaleDateString("en-GB")
+                : "N/A"}
+            </Text>
           </View>
 
-          <View style={styles.priceTag}>
-            <Text style={styles.priceText}>{item.amount}</Text>
-          </View>
+          <Text style={styles.priceText}>₹{item.totalPrice}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -161,65 +285,78 @@ const renderItem = ({ item }: { item: HistoryItem }) => (
 
   return (
     <ScreenLayout scrollable={false}>
+      <InternetStatus
+        onReconnect={() =>
+          dispatch(
+            fetchAssignedOrders({
+              status: "Delivered",
+              page: 1,
+              limit: PAGE_LIMIT,
+            })
+          )
+        }
+      />
+
       <Header
         title="Delivery Records"
         rightIcon="filter-outline"
         onRightPress={() => setModalVisible(true)}
       />
 
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: SW(10),
-          marginVertical: SH(10),
-        }}
-      >
-        <View style={{ flex: 1, height: 1, backgroundColor: '#ccc' }} />
-
-        <Text
-          style={{
-            marginHorizontal: SW(8),
-            fontSize: SH(12),
-            fontFamily: Fonts.Inter_Medium,
-            color: Colors.darkGray,
-            textAlign: 'center',
-          }}
-        >
-          {getFilterMessage(filteredList)}
+      <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: SW(10), marginVertical: SH(10) }}>
+        <View style={{ flex: 1, height: 1, backgroundColor: "#ccc" }} />
+        <Text style={{ marginHorizontal: SW(8), fontSize: SH(12), fontFamily: Fonts.Inter_Medium, color: Colors.darkGray }}>
+          {getFilterMessage()}
         </Text>
-
-        <View style={{ flex: 1, height: 1, backgroundColor: '#ccc' }} />
+        <View style={{ flex: 1, height: 1, backgroundColor: "#ccc" }} />
       </View>
 
-      <View style={{ flex: 1, paddingHorizontal: SW(10) }}>
+      <View style={{ paddingHorizontal: SW(10), paddingVertical: SH(10) }}>
         <FlatList
           data={filteredList}
           renderItem={renderItem}
-          keyExtractor={item => item.id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: SH(120) }}
+          keyExtractor={(item) => item._id}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={Colors.primary}
+            />
+          }
+          ListEmptyComponent={
+            !loading ? (
+              <EmptyState message="No delivery records found." />
+            ) : null
+          }
         />
+
       </View>
 
       <CommonFilterModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         options={[
-          { title: 'Payment Type', data: ['COD', 'Prepaid'] },
-          { title: 'Date', data: ['Today', 'Month', 'Custom Date'] },
+          { title: "Payment Type", data: ["COD", "Prepaid"] },
+          { title: "Date", data: ["Today", "Month", "Custom Date"] },
         ]}
-        onSelect={(value, dateRange) => {
-          if (value === 'Custom Date' && dateRange) {
-            const [start, end] = dateRange.split('|');
+        selectedFilters={selectedFilters}
+        startDate={startDate || undefined}
+        endDate={endDate || undefined}
+        onApply={(filters, dateRange) => {
+          console.log("Filters applied:", filters, dateRange);
+          setSelectedFilters(filters);
+
+          if (filters.includes("Custom Date") && dateRange) {
+            const [start, end] = dateRange.split("|");
             setStartDate(start);
             setEndDate(end);
-            setFilterType('Custom');
           } else {
-            setFilterType(value as any);
             setStartDate(null);
             setEndDate(null);
           }
+
           setModalVisible(false);
         }}
       />
