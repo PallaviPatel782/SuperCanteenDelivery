@@ -105,6 +105,19 @@ export default StyleSheet.create({
     },
     failedText: {
         color: 'rgba(253, 2, 2, 1)', fontSize: SF(10), marginTop: SH(2)
+    },
+    loadMoreBtn: {
+        marginTop: SH(15),
+        alignSelf: 'center',
+
+        paddingHorizontal: SW(20),
+        paddingVertical: SH(8),
+        borderRadius: 8,
+    },
+    loadMoreText: {
+        color: Colors.primary,
+        fontSize: 14,
+        fontWeight: '600',
     }
 
 });

@@ -41,125 +41,79 @@ export type HistoryNavProp = NativeStackNavigationProp<
   "HistoryMain"
 >;
 
-const PAGE_LIMIT = 10;
+const PAGE_LIMIT = 5;
 
-const HistoryScreen: React.FC<{ navigation: HistoryNavProp }> = ({
-  navigation,
-}) => {
+const HistoryScreen: React.FC<{ navigation: HistoryNavProp }> = ({ navigation }) => {
   const dispatch = useDispatch<AppDispatch>();
-  const { data: orders = [], loading } = useSelector(
-    (state: RootState) => state.assignedOrders
+  const deliveredBucket = useSelector(
+    (state: RootState) => state.assignedOrders.paginated.delivered
   );
 
-  const [page, setPage] = useState(1);
-  const [refreshing, setRefreshing] = useState(false);
+  const loading = useSelector(
+    (state: RootState) => state.assignedOrders.loadingMap.delivered
+  );
 
+  const orders = deliveredBucket.data;
+  const currentPage = deliveredBucket.page;
+  const hasMore = deliveredBucket.hasMore;
+  const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
 
+  console.log("paginatedData", orders);
+
+  const fetchOrders = async (page = 1) => {
+    await dispatch(
+      fetchAssignedOrders({
+        status: "Delivered",
+        page,
+        limit: PAGE_LIMIT,
+        listKey: "delivered",
+      })
+    ).unwrap();
+  };
+
   useFocusEffect(
     useCallback(() => {
-      console.log(" History focused → reset & load");
-
-      setPage(1);
       setSelectedFilters([]);
       setStartDate(null);
       setEndDate(null);
-
-      dispatch(
-        fetchAssignedOrders({
-          status: "Delivered",
-          page: 1,
-          limit: PAGE_LIMIT,
-        })
-      );
-
-      return () => {
-        console.log(" Leaving History → clear filters");
-        setSelectedFilters([]);
-        setStartDate(null);
-        setEndDate(null);
-      };
+      fetchOrders(1);
     }, [])
   );
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchOrders(1);
+    setRefreshing(false);
+  };
 
   const loadMore = () => {
-    if (!loading && orders.length >= PAGE_LIMIT) {
-      const nextPage = page + 1;
-      console.log(" Load more triggered, page:", nextPage);
-
-      setPage(nextPage);
-      dispatch(
-        fetchAssignedOrders({
-          status: "Delivered",
-          page: nextPage,
-          limit: PAGE_LIMIT,
-        })
-      );
+    if (!loading && hasMore) {
+      fetchOrders(currentPage + 1);
     }
   };
 
 
-  const onRefresh = async () => {
-    console.log(" Pull to refresh");
-    setRefreshing(true);
-    setPage(1);
-
-    await dispatch(
-      fetchAssignedOrders({
-        status: "Delivered",
-        page: 1,
-        limit: PAGE_LIMIT,
-      })
-    );
-
-    setRefreshing(false);
-  };
-
-  const applyFrontendFilters = (list: OrderType[]) => {
-    console.log(" Applying frontend filters:", selectedFilters);
-
+  const applyFilters = (list: OrderType[]) => {
     return list.filter((order) => {
       let match = true;
-      const now = new Date();
-      const orderDate = order.deliveredAt
-        ? new Date(order.deliveredAt)
-        : new Date(order._id);
-
-
-      const paymentFilters = selectedFilters.filter(
-        f => f === "COD" || f === "Prepaid"
+      const orderDate = new Date(
+        order.deliveredAt ??
+        order.updatedAt ??
+        order.createdAt ??
+        Date.now()
       );
+      const now = new Date();
 
-      if (paymentFilters.length) {
-        match =
-          match &&
-          paymentFilters.some(f =>
-            f === "COD" ? order.isCOD : !order.isCOD
-          );
-      }
+      const paymentFilters = selectedFilters.filter(f => f === "COD" || f === "Prepaid");
+      if (paymentFilters.length) match = match && paymentFilters.some(f => f === "COD" ? order.isCOD : !order.isCOD);
 
-
-      if (selectedFilters.includes("Today")) {
-        match = match && orderDate.toDateString() === now.toDateString();
-      }
-
-
-      if (selectedFilters.includes("Month")) {
-        match =
-          match &&
-          orderDate.getMonth() === now.getMonth() &&
-          orderDate.getFullYear() === now.getFullYear();
-      }
-
-      if (
-        selectedFilters.includes("Custom Date") &&
-        startDate &&
-        endDate
-      ) {
+      if (selectedFilters.includes("Today")) match = match && orderDate.toDateString() === now.toDateString();
+      if (selectedFilters.includes("Month")) match = match && orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
+      if (selectedFilters.includes("Custom Date") && startDate && endDate) {
         const start = new Date(startDate);
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
@@ -170,67 +124,26 @@ const HistoryScreen: React.FC<{ navigation: HistoryNavProp }> = ({
     });
   };
 
-  const filteredList = applyFrontendFilters(orders);
+  const filteredList = applyFilters(orders);
 
-  useEffect(() => {
-    console.log("📦 Total orders from API:", orders.length);
-    console.log("✅ After filter:", filteredList.length);
-  }, [orders, selectedFilters]);
-
-
-  const formatDateShort = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-    });
-  };
-
+  const formatDateShort = (dateStr: string) => new Date(dateStr).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 
   const getFilterMessage = () => {
-    if (selectedFilters.length === 0) return "All Records";
+    if (!selectedFilters.length) return "All Records";
 
-    const parts: string[] = [...selectedFilters];
-
-    if (
-      (selectedFilters.includes("COD") ||
-        selectedFilters.includes("Prepaid")) &&
-      filteredList.length
-    ) {
-      const total = filteredList.reduce(
-        (sum, o) => sum + o.totalPrice,
-        0
-      );
+    const parts = [...selectedFilters];
+    if ((selectedFilters.includes("COD") || selectedFilters.includes("Prepaid")) && filteredList.length) {
+      const total = filteredList.reduce((sum, o) => sum + o.totalPrice, 0);
       parts.push(`Total: ₹${total}`);
     }
-
     if (selectedFilters.includes("Custom Date") && startDate && endDate) {
-      parts.push(
-        `${formatDateShort(startDate)} - ${formatDateShort(endDate)}`
-      );
+      parts.push(`${formatDateShort(startDate)} - ${formatDateShort(endDate)}`);
     }
-
     return `Filtered: ${parts.join(" | ")}`;
   };
 
-  if (loading && !refreshing) {
-    return (
-      <ScreenLayout>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={{ marginTop: 10, color: Colors.primary }}>Loading Not Delivery History...</Text>
-        </View>
-      </ScreenLayout>
-    );
-  }
-
   const renderItem = ({ item }: { item: OrderType }) => (
-    <TouchableOpacity
-      style={styles.cardWrapper}
-      onPress={() =>
-        navigation.navigate("AllDeliveryRecordData", { order: item })
-      }
-    >
+    <TouchableOpacity style={styles.cardWrapper} onPress={() => navigation.navigate("AllDeliveryRecordData", { order: item })}>
       <View style={styles.ribbon}>
         <CheckCircle size={12} color="#fff" />
         <Text style={styles.ribbonText}>{item.status}</Text>
@@ -243,38 +156,20 @@ const HistoryScreen: React.FC<{ navigation: HistoryNavProp }> = ({
             <Text style={styles.orderId}>{item.orderId}</Text>
           </View>
 
-          <View
-            style={[
-              styles.paymentBadge,
-              { backgroundColor: item.isCOD ? "#FFF2F0" : "#E6F7FF" },
-            ]}
-          >
-            <Text
-              style={[
-                styles.paymentText,
-                { color: item.isCOD ? "#D9480F" : "#096DD9" },
-              ]}
-            >
-              {item.isCOD ? "COD" : "Prepaid"}
-            </Text>
+          <View style={[styles.paymentBadge, { backgroundColor: item.isCOD ? "#FFF2F0" : "#E6F7FF" }]}>
+            <Text style={[styles.paymentText, { color: item.isCOD ? "#D9480F" : "#096DD9" }]}>{item.isCOD ? "COD" : "Prepaid"}</Text>
           </View>
         </View>
 
         <View style={styles.row}>
           <UserCheck2Icon size={11} color={Colors.primary} />
-          <Text style={styles.customerName}>
-            {item.shippingAddress?.name || item.user.username}
-          </Text>
+          <Text style={styles.customerName}>{item.shippingAddress?.name || item.user.username}</Text>
         </View>
 
         <View style={styles.rowBetween}>
           <View style={styles.row}>
             <Calendar size={11} color={Colors.primary} />
-            <Text style={styles.date}>
-              {item.deliveredAt
-                ? new Date(item.deliveredAt).toLocaleDateString("en-GB")
-                : "N/A"}
-            </Text>
+            <Text style={styles.date}>{item.deliveredAt ? new Date(item.deliveredAt).toLocaleDateString("en-GB") : "N/A"}</Text>
           </View>
 
           <Text style={styles.priceText}>₹{item.totalPrice}</Text>
@@ -285,53 +180,49 @@ const HistoryScreen: React.FC<{ navigation: HistoryNavProp }> = ({
 
   return (
     <ScreenLayout scrollable={false}>
-      <InternetStatus
-        onReconnect={() =>
-          dispatch(
-            fetchAssignedOrders({
-              status: "Delivered",
-              page: 1,
-              limit: PAGE_LIMIT,
-            })
-          )
-        }
-      />
+      <InternetStatus onReconnect={() => fetchOrders(1)} />
 
-      <Header
-        title="Delivery Records"
-        rightIcon="filter-outline"
-        onRightPress={() => setModalVisible(true)}
-      />
+      <Header title="Delivery Records" rightIcon="filter-outline" onRightPress={() => setModalVisible(true)} />
 
       <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: SW(10), marginVertical: SH(10) }}>
         <View style={{ flex: 1, height: 1, backgroundColor: "#ccc" }} />
-        <Text style={{ marginHorizontal: SW(8), fontSize: SH(12), fontFamily: Fonts.Inter_Medium, color: Colors.darkGray }}>
-          {getFilterMessage()}
-        </Text>
+        <Text style={{ marginHorizontal: SW(8), fontSize: SH(12), fontFamily: Fonts.Inter_Medium, color: Colors.darkGray }}>{getFilterMessage()}</Text>
         <View style={{ flex: 1, height: 1, backgroundColor: "#ccc" }} />
       </View>
 
-      <View style={{ paddingHorizontal: SW(10), paddingVertical: SH(10) }}>
+      <View>
         <FlatList
           data={filteredList}
           renderItem={renderItem}
-          keyExtractor={(item) => item._id}
+          scrollEnabled={true}
+          keyExtractor={(item, index) => item._id + "_" + index}
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={Colors.primary}
-            />
-          }
-          ListEmptyComponent={
-            !loading ? (
-              <EmptyState message="No delivery records found." />
+          contentContainerStyle={{
+            paddingBottom: SH(120),
+            paddingHorizontal: SW(10),
+          }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
+          ListEmptyComponent={!loading ? <EmptyState message="No delivery records found." /> : null}
+          // ListFooterComponent={
+          //   !loading && hasMore ? (
+          //     <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore}>
+          //       <Text style={styles.loadMoreText}>Load More</Text>
+          //     </TouchableOpacity>
+          //   ) : loading && hasMore ? (
+          //     <ActivityIndicator size="small" color={Colors.primary} style={{ marginVertical: SH(10) }} />
+          //   ) : null
+          // }
+          ListFooterComponent={
+            loading && hasMore ? (
+              <ActivityIndicator
+                size="small"
+                color={Colors.primary}
+                style={{ marginVertical: SH(10) }}
+              />
             ) : null
           }
         />
-
       </View>
 
       <CommonFilterModal
@@ -345,9 +236,7 @@ const HistoryScreen: React.FC<{ navigation: HistoryNavProp }> = ({
         startDate={startDate || undefined}
         endDate={endDate || undefined}
         onApply={(filters, dateRange) => {
-          console.log("Filters applied:", filters, dateRange);
           setSelectedFilters(filters);
-
           if (filters.includes("Custom Date") && dateRange) {
             const [start, end] = dateRange.split("|");
             setStartDate(start);
@@ -356,7 +245,6 @@ const HistoryScreen: React.FC<{ navigation: HistoryNavProp }> = ({
             setStartDate(null);
             setEndDate(null);
           }
-
           setModalVisible(false);
         }}
       />

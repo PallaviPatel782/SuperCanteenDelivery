@@ -1,125 +1,183 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity } from 'react-native';
-import { useSelector } from 'react-redux';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../../navigation/AppNavigator';
-import { RootState } from '../../../redux/store';
+import React, { useCallback, useState } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
+import { useSelector, useDispatch } from "react-redux";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useFocusEffect } from "@react-navigation/native";
+import {
+  CheckCircle,
+  Package,
+  UserCheck2Icon,
+  Calendar,
+} from "lucide-react-native";
 
-import ScreenLayout from '../../../components/ScreenLayout';
-import Header from '../../../components/Header';
-import styles from './styles';
-import Colors from '../../../utils/Colors/Colors';
-import Fonts from '../../../utils/Fonts/Fonts';
-import { SH, SW } from '../../../utils/Responsiveness/Dimensions';
-import CommonFilterModal from '../../../components/CommonFilterModal';
-import { useFocusEffect } from '@react-navigation/native';
+import { RootStackParamList } from "../../../navigation/AppNavigator";
+import { RootState, AppDispatch } from "../../../redux/store";
+import { fetchAssignedOrders } from "../../../redux/slices/assignedOrdersSlice";
 
-import { CheckCircle, Package, UserCheck2Icon, Calendar } from 'lucide-react-native';
+import ScreenLayout from "../../../components/ScreenLayout";
+import Header from "../../../components/Header";
+import EmptyState from "../../../components/EmptyState";
+import CommonFilterModal from "../../../components/CommonFilterModal";
 
-type NavProp = NativeStackNavigationProp<RootStackParamList, 'TotalCodCollected'>;
+import Colors from "../../../utils/Colors/Colors";
+import Fonts from "../../../utils/Fonts/Fonts";
+import { SH, SW } from "../../../utils/Responsiveness/Dimensions";
+import styles from "./styles";
+
+type NavProp = NativeStackNavigationProp<
+  RootStackParamList,
+  "TotalCodCollected"
+>;
 
 interface Props {
   navigation: NavProp;
 }
 
+const PAGE_LIMIT = 5;
+
 const TotalCodCollected: React.FC<Props> = ({ navigation }) => {
-  const { data: orders = [] } = useSelector(
-    (state: RootState) => state.assignedOrders
+  const dispatch = useDispatch<AppDispatch>();
+
+  const deliveredBucket = useSelector(
+    (state: RootState) => state.assignedOrders.paginated.delivered
   );
 
+  const loading = useSelector(
+    (state: RootState) => state.assignedOrders.loadingMap.delivered
+  );
+
+  const orders = deliveredBucket.data;
+  const currentPage = deliveredBucket.page;
+  const hasMore = deliveredBucket.hasMore;
+
+  const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
+
+  const fetchOrders = async (page = 1) => {
+    await dispatch(
+      fetchAssignedOrders({
+        status: "Delivered",
+        page,
+        limit: PAGE_LIMIT,
+        listKey: "delivered",
+      })
+    ).unwrap();
+  };
 
   useFocusEffect(
     useCallback(() => {
       setSelectedFilters([]);
       setStartDate(null);
       setEndDate(null);
+      fetchOrders(1);
     }, [])
   );
 
-  const baseList = orders.filter(o =>
-    o.isCOD &&
-    o.status === 'Delivered' &&
-    o.deliveredAt &&
-    new Date(o.deliveredAt).toDateString() === new Date().toDateString()
-  );
-
-  const parseLocalDate = (dateStr: string) => {
-    const [y, m, d] = dateStr.split("-").map(Number);
-    return new Date(y, m - 1, d);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchOrders(1);
+    setRefreshing(false);
   };
 
-  const filteredList = baseList.filter(order => {
-    let match = true;
-    const orderDate = new Date(order.deliveredAt);
+  const loadMore = () => {
+    if (!loading && hasMore) {
+      fetchOrders(currentPage + 1);
+    }
+  };
 
-    if (selectedFilters.includes("Today")) {
-      match = match && orderDate.toDateString() === new Date().toDateString();
+
+  const filteredList = orders.filter((order) => {
+    if (!order.isCOD || !order.deliveredAt) return false;
+
+    const orderDate = new Date(order.deliveredAt);
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    let match = true;
+
+    if (selectedFilters.length === 0 || selectedFilters.includes("Today")) {
+      match = orderDate >= todayStart && orderDate <= todayEnd;
     }
 
     if (selectedFilters.includes("Custom Date") && startDate && endDate) {
-      const start = parseLocalDate(startDate);
-      const end = parseLocalDate(endDate);
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
-      match = match && orderDate >= start && orderDate <= end;
+
+      match = orderDate >= start && orderDate <= end;
     }
 
     return match;
   });
 
-  const totalCODAmount = filteredList.reduce(
-    (sum, o) => sum + (o.totalPrice || 0),
-    0
-  );
+  const totalCODAmount = filteredList
+    .reduce((sum, o) => sum + (o.totalPrice || 0), 0)
+    .toFixed(2);
+
 
   const renderItem = ({ item }: any) => (
     <TouchableOpacity
       style={styles.cardWrapper}
       onPress={() =>
-        navigation.navigate('MainTabs', {
-          screen: 'History',
+        navigation.navigate("MainTabs", {
+          screen: "History",
           params: {
-            screen: 'AllDeliveryRecordData',
+            screen: "AllDeliveryRecordData",
             params: { order: item },
           },
         })
       }
     >
       <View style={styles.ribbon}>
-        <CheckCircle size={12} color="#fff" style={{ marginRight: 5 }} />
+        <CheckCircle size={12} color="#fff" />
         <Text style={styles.ribbonText}>Delivered</Text>
       </View>
 
       <View style={styles.historyCard}>
         <View style={styles.rowBetween}>
           <View style={styles.row}>
-            <Package size={11} color={Colors.primary} style={{ marginRight: 6 }} />
+            <Package size={11} color={Colors.primary} />
             <Text style={styles.orderId}>{item.orderId}</Text>
           </View>
 
-          <View style={[styles.paymentBadge, { backgroundColor: '#FFF2F0' }]}>
-            <Text style={[styles.paymentText, { color: '#D9480F' }]}>COD</Text>
+          <View style={[styles.paymentBadge, { backgroundColor: "#FFF2F0" }]}>
+            <Text style={[styles.paymentText, { color: "#D9480F" }]}>
+              COD
+            </Text>
           </View>
         </View>
 
         <View style={styles.row}>
-          <UserCheck2Icon size={11} color={Colors.primary} style={{ marginRight: 6 }} />
-          <Text style={styles.customerName}>{item.shippingAddress?.name}</Text>
+          <UserCheck2Icon size={11} color={Colors.primary} />
+          <Text style={styles.customerName}>
+            {item.shippingAddress?.name}
+          </Text>
         </View>
 
         <View style={styles.rowBetween}>
           <View style={styles.row}>
-            <Calendar size={11} color={Colors.primary} style={{ marginRight: 4 }} />
+            <Calendar size={11} color={Colors.primary} />
             <Text style={styles.date}>
               {new Date(item.deliveredAt).toLocaleDateString()}
             </Text>
           </View>
-          <View style={styles.priceTag}>
-            <Text style={styles.priceText}>₹{item.totalPrice}</Text>
-          </View>
+
+          <Text style={styles.priceText}>₹{item.totalPrice}</Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -130,13 +188,27 @@ const TotalCodCollected: React.FC<Props> = ({ navigation }) => {
       <Header
         showBack
         title="COD Records"
-        // rightIcon="filter-outline"
-        // onRightPress={() => setModalVisible(true)}
+        rightIcon="filter-outline"
+        onRightPress={() => setModalVisible(true)}
       />
 
-      <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: SW(10), marginVertical: SH(10) }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: SW(10),
+          marginVertical: SH(10),
+        }}
+      >
         <View style={{ flex: 1, height: 1, backgroundColor: "#ccc" }} />
-        <Text style={{ marginHorizontal: SW(8), fontSize: SH(12), fontFamily: Fonts.Inter_Medium, color: Colors.darkGray }}>
+        <Text
+          style={{
+            marginHorizontal: SW(8),
+            fontSize: SH(12),
+            fontFamily: Fonts.Inter_Medium,
+            color: Colors.darkGray,
+          }}
+        >
           Total ₹{totalCODAmount}
         </Text>
         <View style={{ flex: 1, height: 1, backgroundColor: "#ccc" }} />
@@ -145,15 +217,38 @@ const TotalCodCollected: React.FC<Props> = ({ navigation }) => {
       <FlatList
         data={filteredList}
         renderItem={renderItem}
-        keyExtractor={item => item._id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: SH(120), paddingHorizontal: SW(10) }}
+        keyExtractor={(item, index) => item._id + "_" + index}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.primary}
+          />
+        }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListEmptyComponent={
+          !loading ? <EmptyState message="No COD records found." /> : null
+        }
+        ListFooterComponent={
+          loading && hasMore ? (
+            <ActivityIndicator
+              size="small"
+              color={Colors.primary}
+              style={{ marginVertical: SH(10) }}
+            />
+          ) : null
+        }
+        contentContainerStyle={{
+          paddingBottom: SH(120),
+          paddingHorizontal: SW(10),
+        }}
       />
 
       <CommonFilterModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        options={[{ title: 'Date', data: ['Today', 'Custom Date'] }]}
+        options={[{ title: "Date", data: ["Today", "Custom Date"] }]}
         selectedFilters={selectedFilters}
         startDate={startDate || undefined}
         endDate={endDate || undefined}

@@ -4,6 +4,16 @@ import { SH, SW, SF } from '../../../utils/Responsiveness/Dimensions';
 import Fonts from '../../../utils/Fonts/Fonts';
 
 export default StyleSheet.create({
+    overviewCard1: {
+        borderRadius: 12,
+        borderColor: Colors.lightGray,
+        borderWidth: 1,
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 3 },
+        marginVertical: SH(10)
+
+    },
     overviewContainer: {
         marginBottom: SH(20),
         backgroundColor: Colors.White,
@@ -59,7 +69,7 @@ export default StyleSheet.create({
         shadowRadius: 8,
         shadowOffset: { width: 0, height: 3 },
         elevation: 3,
-        marginTop:SH(6)
+        marginTop: SH(6)
     },
     overviewCardTitle: {
         fontSize: SF(10),
@@ -103,7 +113,7 @@ export default StyleSheet.create({
         borderRadius: 16,
         borderWidth: 1,
         borderColor: '#EAEAEA',
-         borderTopLeftRadius:0,
+        borderTopLeftRadius: 0,
         elevation: 4,
         shadowColor: '#00000040',
     },
@@ -168,8 +178,6 @@ export default StyleSheet.create({
         width: '85%',
     },
 
-
-    // Section Header
     sectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -186,4 +194,47 @@ export default StyleSheet.create({
         color: Colors.primary,
         fontFamily: Fonts.Inter_SemiBold,
     },
+    codSummaryCard: {
+        flexDirection: 'row',
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        paddingVertical: SH(14),
+        paddingHorizontal: SW(10),
+        marginVertical: SH(10),
+        marginHorizontal: SW(10),
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 2 },
+    },
+
+    codSection: {
+        flex: 1,
+        alignItems: 'center',
+    },
+
+    codLabel: {
+        fontSize: SF(12),
+        color: '#667085',
+        marginBottom: SH(4),
+    },
+
+    codValue: {
+        fontSize: SF(10),
+        fontFamily: Fonts.Inter_SemiBold,
+        color: '#101828',
+    },
+
+    codDate: {
+        fontSize: SF(10),
+        fontFamily: Fonts.Inter_SemiBold,
+        color: '#344054',
+    },
+
+    verticalDivider: {
+        width: 1,
+        backgroundColor: '#EAECF0',
+    },
+
 });

@@ -8,6 +8,9 @@ export interface DeliveryBoy {
   email: string;
   contactNo: string;
   profilePhoto?: string;
+  pendingCodAmount?: number;
+  totalCodCollected?: number;
+  lastSettlementAt?: string;
   address?: {
     street: string;
     area: string;

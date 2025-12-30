@@ -94,4 +94,19 @@ export default StyleSheet.create({
     fontSize: SF(11),
   },
 
+  loadMoreBtn: {
+    marginTop: SH(15),
+    alignSelf: 'center',
+
+    paddingHorizontal: SW(20),
+    paddingVertical: SH(8),
+    borderRadius: 8,
+  },
+  loadMoreText: {
+    color: Colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
+  }
+
+
 });

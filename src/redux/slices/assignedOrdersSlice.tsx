@@ -7,48 +7,97 @@ import {
   CUSTOMER_UNAVAILABLE,
 } from "../../utils/apis/BASE_URL";
 
-/* ================= FETCH ASSIGNED ORDERS ================= */
+import { OrderType } from "../../navigation/AppNavigator";
+
+type PaginatedBucket = {
+  data: OrderType[];
+  page: number;
+  hasMore: boolean;
+};
+
+interface AssignedOrdersState {
+  loadingMap: {
+    delivered: boolean;
+    cancelled: boolean;
+    failed: boolean;
+    pending: boolean;
+  };
+
+  paginated: {
+    delivered: PaginatedBucket;
+    cancelled: PaginatedBucket;
+    failed: PaginatedBucket;
+    pending: PaginatedBucket;
+  };
+
+  allData: OrderType[];
+  actionLoading: boolean;
+  lastMessage: string | null;
+  error: string | null;
+}
+
+
+type ListKey = "delivered" | "cancelled" | "failed" | "pending";
 
 export const fetchAssignedOrders = createAsyncThunk<
-  { orders: any[]; page: number },
+  { orders: OrderType[]; page: number; listKey: ListKey },
   {
-    status?: string;
+    status?: string | string[];
     orderStatus?: string;
-    page?: number;
-    limit?: number;
+    page: number;
+    limit: number;
+    listKey: ListKey;
   },
   { rejectValue: string }
 >(
   "orders/fetchAssignedOrders",
-  async (
-    { status, orderStatus, page = 1, limit = 10 },
-    thunkAPI
-  ) => {
+  async ({ status, orderStatus, page, limit, listKey }, thunkAPI) => {
     try {
-      const query = new URLSearchParams({
-        ...(status && { status }),
-        ...(orderStatus && { orderStatus }),
-        page: page.toString(),
-        limit: limit.toString(),
-      }).toString();
+      const query: string[] = [];
 
-      const res = await api.get(`${ASSIGNED_ORDERS}?${query}`);
+      if (status) {
+        query.push(
+          `status=${Array.isArray(status) ? status.join(",") : status}`
+        );
+      }
 
-      return {
-        orders: res.data.orders,
-        page,
-      };
+      if (orderStatus) query.push(`orderStatus=${orderStatus}`);
+
+      query.push(`page=${page}`);
+      query.push(`limit=${limit}`);
+
+      const res = await api.get(`${ASSIGNED_ORDERS}?${query.join("&")}`);
+
+      return { orders: res.data.orders || [], page, listKey };
     } catch (err: any) {
-      return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Failed to fetch assigned orders"
-      );
+      return thunkAPI.rejectWithValue("Failed to fetch orders");
     }
   }
 );
 
 
+export const fetchAllAssignedOrders = createAsyncThunk<
+  OrderType[],
+  { status?: string; orderStatus?: string }
+>("orders/fetchAllAssignedOrders", async (
+  { status, orderStatus },
+  thunkAPI
+) => {
+  try {
+    const query = new URLSearchParams({
+      ...(status && { status }),
+      ...(orderStatus && { orderStatus }),
+    }).toString();
 
-/* ================= REACHED DROP ================= */
+    const res = await api.get(`${ASSIGNED_ORDERS}?${query}`);
+    return res.data.orders;
+  } catch (err: any) {
+    return thunkAPI.rejectWithValue(
+      err.response?.data?.message || "Failed to fetch all assigned orders"
+    );
+  }
+});
+
 
 export const reachedDropOrder = createAsyncThunk(
   "orders/reachedDrop",
@@ -67,143 +116,163 @@ export const reachedDropOrder = createAsyncThunk(
   }
 );
 
-/* ================= COMPLETE DELIVERY ================= */
 
 export const completeDeliveryOrder = createAsyncThunk<
   { order: any; message: string },
   { orderId: string; otp: string },
   { rejectValue: string }
->(
-  "orders/completeDelivery",
-  async ({ orderId, otp }, thunkAPI) => {
-    try {
-      console.log("orderId", orderId, "otp", otp);
-      const res = await api.put(`${COMPLETE_ORDER}/${orderId}`, { otp });
-      console.log("completeDelivery res", res.data);
-      return {
-        order: res.data.order,
-        message: res.data.message || "Delivery completed successfully",
-      };
-    } catch (err: any) {
-      console.log("completeDelivery err", err.response?.data?.message)
-      return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Delivery completion failed"
-      );
-    }
+>("orders/completeDelivery", async ({ orderId, otp }, thunkAPI) => {
+  try {
+    const res = await api.put(`${COMPLETE_ORDER}/${orderId}`, { otp });
+    return {
+      order: res.data.order,
+      message: res.data.message,
+    };
+  } catch (err: any) {
+    return thunkAPI.rejectWithValue(
+      err.response?.data?.message || "Delivery completion failed"
+    );
   }
-);
+});
 
-
-/* ================= CUSTOMER UNAVAILABLE ================= */
 
 export const customerUnavailableOrder = createAsyncThunk<
   { order: any; message: string },
   { orderId: string; reason: string },
   { rejectValue: string }
->(
-  "orders/customerUnavailable",
-  async ({ orderId, reason }, thunkAPI) => {
-    try {
-      console.log("orderId", orderId, "reason", reason);
-      const res = await api.put(`${CUSTOMER_UNAVAILABLE}/${orderId}`, {
-        reason,
-      });
-
-      console.log("customerUnavailable res", res.data);
-
-      return {
-        order: res.data.order,
-        message: res.data.message || "Customer marked as unavailable",
-      };
-    } catch (err: any) {
-      console.log("customerUnavailable err", err.response?.data?.message)
-      return thunkAPI.rejectWithValue(
-        err.response?.data?.message || "Customer unavailable failed"
-      );
-    }
+>("orders/customerUnavailable", async ({ orderId, reason }, thunkAPI) => {
+  try {
+    const res = await api.put(`${CUSTOMER_UNAVAILABLE}/${orderId}`, { reason });
+    return {
+      order: res.data.order,
+      message: res.data.message,
+    };
+  } catch (err: any) {
+    return thunkAPI.rejectWithValue(
+      err.response?.data?.message || "Customer unavailable failed"
+    );
   }
-);
+});
 
+const initialPaginated: PaginatedBucket = {
+  data: [],
+  page: 1,
+  hasMore: true,
+};
 
-/* ================= SLICE ================= */
+const initialState: AssignedOrdersState = {
+  loadingMap: {
+    delivered: false,
+    cancelled: false,
+    failed: false,
+    pending: false,
+  },
+
+  paginated: {
+    delivered: { ...initialPaginated },
+    cancelled: { ...initialPaginated },
+    failed: { ...initialPaginated },
+    pending: { ...initialPaginated },
+  },
+
+  allData: [],
+  actionLoading: false,
+  lastMessage: null,
+  error: null,
+};
 
 const assignedOrdersSlice = createSlice({
   name: "assignedOrders",
-  initialState: {
-    loading: false,
-    page: 1,
-    hasMore: true,
-    actionLoading: false,
-    data: [] as any[],
-    error: null as string | null,
-    lastMessage: null as string | null,
-  },
+  initialState,
   reducers: {},
   extraReducers: (builder) => {
     builder
-      /* FETCH */
-      .addCase(fetchAssignedOrders.pending, (state) => {
-        state.loading = true;
+      /* ================= FETCH ================= */
+      .addCase(fetchAssignedOrders.pending, (state, action) => {
+        state.loadingMap[action.meta.arg.listKey] = true;
       })
-      .addCase(fetchAssignedOrders.fulfilled, (state, action) => {
-        state.loading = false;
 
-        if (action.payload.page === 1) {
-          state.data = action.payload.orders;
+      .addCase(fetchAssignedOrders.fulfilled, (state, action) => {
+        const { listKey, orders, page } = action.payload;
+        const bucket = state.paginated[listKey];
+
+        state.loadingMap[listKey] = false;
+
+        if (page === 1) {
+          bucket.data = orders;
         } else {
-          state.data = [...state.data, ...action.payload.orders];
+          bucket.data.push(
+            ...orders.filter(
+              o => !bucket.data.some(e => e._id === o._id)
+            )
+          );
         }
 
-        state.page = action.payload.page;
-        state.hasMore = action.payload.orders.length > 0;
-      })
-      .addCase(fetchAssignedOrders.rejected, (state) => {
-        state.loading = false;
+        bucket.page = page;
+        bucket.hasMore = orders.length > 0;
       })
 
-      /* REACHED DROP */
-      .addCase(reachedDropOrder.pending, (state) => {
+      .addCase(fetchAssignedOrders.rejected, (state, action) => {
+        state.loadingMap[action.meta.arg.listKey] = false;
+      })
+
+      .addCase(fetchAllAssignedOrders.pending, (state) => {
         state.actionLoading = true;
       })
-      .addCase(reachedDropOrder.fulfilled, (state, action) => {
+
+      .addCase(fetchAllAssignedOrders.fulfilled, (state, action) => {
         state.actionLoading = false;
-        replaceOrder(state.data, action.payload.order);
-        state.lastMessage = action.payload.message; // 🔹 store message
+        state.allData = action.payload;
       })
-      .addCase(reachedDropOrder.rejected, (state, action) => {
+
+      .addCase(fetchAllAssignedOrders.rejected, (state, action) => {
         state.actionLoading = false;
         state.error = action.payload as string;
       })
 
-      /* COMPLETE DELIVERY */
-      .addCase(completeDeliveryOrder.pending, (state) => {
-        state.actionLoading = true;
-      })
-      .addCase(completeDeliveryOrder.fulfilled, (state, action) => {
-        state.actionLoading = false;
-        replaceOrder(state.data, action.payload.order);
-        state.lastMessage = action.payload.message; // 🔹 store message
-      })
-      .addCase(completeDeliveryOrder.rejected, (state, action) => {
-        state.actionLoading = false;
-        state.error = action.payload as string;
-      })
+      /* ================= ACTIONS ================= */
+      .addCase(reachedDropOrder.pending, actionPending)
+      .addCase(reachedDropOrder.fulfilled, actionSuccess)
+      .addCase(reachedDropOrder.rejected, actionError)
 
-      /* CUSTOMER UNAVAILABLE */
-      .addCase(customerUnavailableOrder.pending, (state) => {
-        state.actionLoading = true;
-      })
-      .addCase(customerUnavailableOrder.fulfilled, (state, action) => {
-        state.actionLoading = false;
-        replaceOrder(state.data, action.payload.order);
-        state.lastMessage = action.payload.message; // 🔹 store message
-      })
-      .addCase(customerUnavailableOrder.rejected, (state, action) => {
-        state.actionLoading = false;
-        state.error = action.payload as string;
-      });
+      .addCase(completeDeliveryOrder.pending, actionPending)
+      .addCase(completeDeliveryOrder.fulfilled, actionSuccess)
+      .addCase(completeDeliveryOrder.rejected, actionError)
+
+      .addCase(customerUnavailableOrder.pending, actionPending)
+      .addCase(customerUnavailableOrder.fulfilled, actionSuccess)
+      .addCase(customerUnavailableOrder.rejected, actionError);
   },
 });
+
+
+/* =========================================================
+   COMMON HELPERS
+========================================================= */
+
+const actionPending = (state: any) => {
+  state.actionLoading = true;
+};
+
+const actionSuccess = (state: any, action: any) => {
+  state.actionLoading = false;
+  state.lastMessage = action.payload.message;
+
+  Object.values(state.paginated).forEach((bucket: any) => {
+    const index = bucket.data.findIndex(
+      (o: any) => o._id === action.payload.order._id
+    );
+    if (index !== -1) bucket.data[index] = action.payload.order;
+  });
+
+  replaceOrder(state.allData, action.payload.order);
+};
+
+
+const actionError = (state: any, action: any) => {
+  state.actionLoading = false;
+  state.error = action.payload;
+};
 
 const replaceOrder = (orders: any[], updatedOrder: any) => {
   const index = orders.findIndex((o) => o._id === updatedOrder._id);

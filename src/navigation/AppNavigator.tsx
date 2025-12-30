@@ -56,7 +56,6 @@ export type OrderType = {
     deliveryStatus: string;
     createdAt?: string;
     updatedAt?: string;
-
 };
 
 export type OrderItemType = {

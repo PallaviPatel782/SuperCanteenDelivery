@@ -10,12 +10,13 @@ import React from "react";
 import GlobalStyles from "../../../utils/GlobalStyles/GlobalStyles";
 import Header from "../../../components/Header";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { SF,SW,SH } from "../../../utils/Responsiveness/Dimensions";
+import { SF, SW, SH } from "../../../utils/Responsiveness/Dimensions";
 import Colors from "../../../utils/Colors/Colors";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
+import ScreenLayout from "../../../components/ScreenLayout";
 
 
-const ContactSupport= () => {
+const ContactSupport = () => {
     const handleEmailPress = () => {
         Linking.openURL("mailto:info@supercanteen.com");
     };
@@ -25,10 +26,7 @@ const ContactSupport= () => {
     };
 
     return (
-        <SafeAreaView
-            style={[GlobalStyles.container, { backgroundColor: "#F5F8FF" }]}
-            edges={["top", "bottom"]}
-        >
+        <ScreenLayout>
             <Header title="Contact Support" showBack={true} />
             <ScrollView
                 contentContainerStyle={styles.content}
@@ -70,7 +68,7 @@ const ContactSupport= () => {
                 </TouchableOpacity>
             </ScrollView>
 
-        </SafeAreaView>
+        </ScreenLayout>
     );
 };
 
